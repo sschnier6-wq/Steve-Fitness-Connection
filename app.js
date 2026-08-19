@@ -413,22 +413,28 @@ document.getElementById("save-log-btn").addEventListener("click", () => {
   for (let i = 0; i < inputs.length; i += 2) {
     const w = inputs[i].value.trim();
     const r = inputs[i+1] ? inputs[i+1].value.trim() : "";
-    if (w !== "" && r !== "") {
-      tempSets.push({ weight: Number(w), reps: Number(r) });
+    // Allow weight-only machines OR bodyweight (reps only → weight 0)
+    if (r !== "") {
+      tempSets.push({ weight: w !== "" ? Number(w) : 0, reps: Number(r) });
+    } else if (w !== "") {
+      // weight entered but no reps – still keep as 1 rep so nothing is lost
+      tempSets.push({ weight: Number(w), reps: 1 });
     }
   }
 
   if (!tempSets.length) {
-    showToast("Enter at least one set (weight + reps)");
+    showToast("Enter at least one set");
     return;
   }
 
-  // Create or update active workout
+  // Auto-start workout if user forgot to hit Start – nothing is lost
   if (!activeWorkout) {
+    const startIso = new Date().toISOString();
     activeWorkout = {
-      date: new Date().toISOString(),
+      date: startIso,
       exercises: []
     };
+    setWorkoutActiveUI(startIso);
   }
 
   const entry = {
@@ -445,12 +451,12 @@ document.getElementById("save-log-btn").addEventListener("click", () => {
     activeWorkout.exercises.push(entry);
   }
 
-  // Persist draft so it survives page refresh
+  // Always persist draft so a refresh or forgotten "Start" never loses logs
   saveDraft();
 
-  showToast(`Saved ${currentLogExercise.name} (${tempSets.length} set${tempSets.length > 1 ? "s" : ""})`);
+  showToast(`Saved ${currentLogExercise.name} (${tempSets.length} set${tempSets.length > 1 ? "s" : ""}) – workout auto-saved`);
   document.getElementById("log-modal").classList.add("hidden");
-  renderExercises(); // now shows the just-saved sets
+  renderExercises();
   document.getElementById("mark-complete-btn").style.display = "inline-block";
 });
 
@@ -458,12 +464,77 @@ document.querySelector(".close-modal").addEventListener("click", () => {
   document.getElementById("log-modal").classList.add("hidden");
 });
 
+// ===== Workout active UI =====
+function formatDateTime(iso) {
+  const d = new Date(iso);
+  const dateStr = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  const timeStr = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return dateStr + " · " + timeStr;
+}
+
+function setWorkoutActiveUI(startIso) {
+  const panel = document.getElementById("suggestion-panel");
+  const status = document.getElementById("workout-status");
+  const startBtn = document.getElementById("start-suggested-btn");
+  const completeBtn = document.getElementById("mark-complete-btn");
+
+  panel.classList.add("workout-active");
+  startBtn.classList.add("workout-running");
+  startBtn.textContent = "Workout In Progress";
+  startBtn.disabled = true;
+  completeBtn.style.display = "inline-block";
+  completeBtn.classList.add("btn-active-complete");
+  status.className = "workout-status active";
+  status.textContent = "Started: " + formatDateTime(startIso);
+}
+
+function setWorkoutCompletedUI(startIso, endIso) {
+  const panel = document.getElementById("suggestion-panel");
+  const status = document.getElementById("workout-status");
+  const startBtn = document.getElementById("start-suggested-btn");
+  const completeBtn = document.getElementById("mark-complete-btn");
+
+  panel.classList.remove("workout-active");
+  startBtn.classList.remove("workout-running");
+  startBtn.textContent = "Start This Workout";
+  startBtn.disabled = false;
+  completeBtn.style.display = "none";
+  completeBtn.classList.remove("btn-active-complete");
+  status.className = "workout-status completed";
+  let text = "Last completed: " + formatDateTime(endIso);
+  if (startIso) text = "Started: " + formatDateTime(startIso) + "  →  Ended: " + formatDateTime(endIso);
+  status.textContent = text;
+}
+
+function setWorkoutIdleUI() {
+  const panel = document.getElementById("suggestion-panel");
+  const status = document.getElementById("workout-status");
+  const startBtn = document.getElementById("start-suggested-btn");
+  const completeBtn = document.getElementById("mark-complete-btn");
+
+  panel.classList.remove("workout-active");
+  startBtn.classList.remove("workout-running");
+  startBtn.textContent = "Start This Workout";
+  startBtn.disabled = false;
+  completeBtn.style.display = "none";
+  completeBtn.classList.remove("btn-active-complete");
+  // leave any completed message; clear only if empty
+  if (!status.textContent || status.classList.contains("active")) {
+    status.className = "workout-status";
+    status.textContent = "";
+  }
+}
+
 // ===== Mark Complete =====
 document.getElementById("mark-complete-btn").addEventListener("click", () => {
   if (!activeWorkout || !activeWorkout.exercises.length) {
     showToast("No exercises logged yet");
     return;
   }
+  const endIso = new Date().toISOString();
+  const startIso = activeWorkout.date;
+  activeWorkout.endedAt = endIso;
+
   const hist = getHistory();
   if (workoutAlreadyInHistory(activeWorkout, hist)) {
     showToast("This workout is already in history – skipped duplicate");
@@ -474,20 +545,30 @@ document.getElementById("mark-complete-btn").addEventListener("click", () => {
   }
   activeWorkout = null;
   saveDraft(); // clears the draft
-  document.getElementById("mark-complete-btn").style.display = "none";
+  setWorkoutCompletedUI(startIso, endIso);
   renderSuggestion();
   renderExercises();
   renderHistory();
 });
 
 document.getElementById("start-suggested-btn").addEventListener("click", () => {
+  // If a workout is already in progress with logged sets, keep it – don't wipe
+  if (activeWorkout && activeWorkout.exercises && activeWorkout.exercises.length) {
+    setWorkoutActiveUI(activeWorkout.date || new Date().toISOString());
+    showToast("Workout already in progress – your logs are saved");
+    document.querySelector('.tab[data-tab="upper"]').click();
+    return;
+  }
+
+  // If there's a leftover empty shell, or none, start fresh
+  const startIso = new Date().toISOString();
   activeWorkout = {
-    date: new Date().toISOString(),
-    exercises: []
+    date: startIso,
+    exercises: activeWorkout && activeWorkout.exercises ? activeWorkout.exercises : []
   };
+  saveDraft();
+  setWorkoutActiveUI(startIso);
   showToast("Workout started – log your sets as you go");
-  document.getElementById("mark-complete-btn").style.display = "inline-block";
-  // Switch to Upper tab
   document.querySelector('.tab[data-tab="upper"]').click();
 });
 
@@ -639,7 +720,7 @@ document.getElementById("import-history-file").addEventListener("change", (e) =>
       if (draft && !activeWorkout) {
         localStorage.setItem("fitnessDraft", JSON.stringify(draft));
         activeWorkout = draft;
-        document.getElementById("mark-complete-btn").style.display = "inline-block";
+        setWorkoutActiveUI(draft.date || new Date().toISOString());
       }
 
       const msg = skipped
@@ -750,13 +831,27 @@ function showToast(msg) {
 
 // ===== Init =====
 function init() {
-  // Restore any in-progress workout from a previous session
-  if (loadDraft()) {
-    document.getElementById("mark-complete-btn").style.display = "inline-block";
+  // Restore any in-progress workout from a previous session (logs kept even without Start)
+  if (loadDraft() && activeWorkout) {
+    setWorkoutActiveUI(activeWorkout.date || new Date().toISOString());
+    if (activeWorkout.exercises && activeWorkout.exercises.length) {
+      // Ensure Mark Complete is available so user can finish later
+      document.getElementById("mark-complete-btn").style.display = "inline-block";
+    }
   }
   renderSuggestion();
   renderExercises();
   renderHistory();
 }
+
+// Save draft whenever the page is backgrounded or closed so nothing is lost
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden" && activeWorkout) {
+    saveDraft();
+  }
+});
+window.addEventListener("pagehide", () => {
+  if (activeWorkout) saveDraft();
+});
 
 init();

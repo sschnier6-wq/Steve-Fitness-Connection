@@ -432,3 +432,43 @@ header h1 {
   min-width: 120px;
   text-align: center;
 }
+
+/* Active workout state */
+#suggestion-panel.workout-active {
+  border-color: var(--success);
+  box-shadow: 0 0 0 1px var(--success);
+}
+
+.workout-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.workout-status {
+  margin-top: 10px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  min-height: 1.2em;
+}
+
+.workout-status.active {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.workout-status.completed {
+  color: var(--muted);
+}
+
+.btn.workout-running {
+  background: linear-gradient(135deg, #1a7a6d, #2ec4b6);
+  color: #fff;
+}
+
+#mark-complete-btn.btn-active-complete {
+  background: linear-gradient(135deg, #2ec4b6, #4cc9f0);
+  color: #000;
+  font-weight: 700;
+}
