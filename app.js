@@ -36,7 +36,31 @@ let currentLogExercise = null;
 let currentSets = [];
 let activeWorkout = null; // { started: timestamp, exercises: [] }
 
+// ===== Custom Exercises (persisted separately – does NOT touch workout history) =====
+function getCustomExercises() {
+  try {
+    return JSON.parse(localStorage.getItem("customExercises") || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomExercises(list) {
+  localStorage.setItem("customExercises", JSON.stringify(list));
+}
+
+function getAllEquipment(cat) {
+  const builtIn = EQUIPMENT[cat] || [];
+  const custom = getCustomExercises().filter(e => e.category === cat);
+  return [...builtIn, ...custom];
+}
+
+function findExercise(exId, cat) {
+  return getAllEquipment(cat).find(e => e.id === exId) || null;
+}
+
 // ===== LocalStorage Helpers =====
+// IMPORTANT: fitnessHistory and fitnessDraft keys are never renamed so existing logs are preserved.
 function getHistory() {
   try {
     return JSON.parse(localStorage.getItem("fitnessHistory") || "[]");
@@ -47,6 +71,29 @@ function getHistory() {
 
 function saveHistory(history) {
   localStorage.setItem("fitnessHistory", JSON.stringify(history));
+}
+
+/** Two workouts are duplicates if they fall on the same calendar day
+ *  and contain the same set of exercise IDs (order-independent).
+ *  Exact ISO date match also counts as duplicate.
+ */
+function isDuplicateWorkout(a, b) {
+  if (!a || !b) return false;
+  if (a.date && b.date && a.date === b.date) return true;
+  try {
+    const dayA = new Date(a.date).toDateString();
+    const dayB = new Date(b.date).toDateString();
+    if (dayA !== dayB) return false;
+    const idsA = (a.exercises || []).map(e => e.id).filter(Boolean).sort().join("|");
+    const idsB = (b.exercises || []).map(e => e.id).filter(Boolean).sort().join("|");
+    return idsA.length > 0 && idsA === idsB;
+  } catch {
+    return false;
+  }
+}
+
+function workoutAlreadyInHistory(workout, history) {
+  return history.some(existing => isDuplicateWorkout(existing, workout));
 }
 
 function getLastWorkout() {
@@ -166,43 +213,141 @@ function renderSuggestion() {
 }
 
 // ===== Render Equipment Cards =====
+function getSuggestedIds() {
+  const s = generateSuggestion();
+  const ids = new Set();
+  (s.upper || []).forEach(e => ids.add(e.id));
+  (s.lower || []).forEach(e => ids.add(e.id));
+  // Core/mobility in suggestion are name-based; map common ones
+  const coreMap = {
+    "Single-Leg Balance": "single-leg-balance",
+    "Single-Leg RDL": "single-leg-rdl",
+    "Heel-to-Toe Walk": "heel-to-toe",
+    "World's Greatest Stretch": "worlds-greatest",
+    "Hip Flexor Stretch": "hip-flexor",
+    "Bird-Dog": "bird-dog",
+    "Thoracic Rotations": "thoracic-rotation"
+  };
+  (s.core || []).forEach(e => {
+    if (coreMap[e.name]) ids.add(coreMap[e.name]);
+  });
+  ids.add("cycling");
+  return ids;
+}
+
 function renderExercises() {
+  const suggestedIds = getSuggestedIds();
+
   ["upper", "lower", "core", "aerobic"].forEach(cat => {
     const container = document.getElementById(`${cat}-exercises`);
     container.innerHTML = "";
-    EQUIPMENT[cat].forEach(ex => {
-      const last = getLastForExercise(ex.id);
-      let lastText = "No previous log";
-      if (last && last.sets.length) {
-        lastText = "Last: " + last.sets.map(s => `${s.reps}@${s.weight}`).join(", ");
-      }
 
-      const card = document.createElement("div");
-      card.className = "exercise-card";
-      card.innerHTML = `
-        <img src="${ex.img}" alt="${ex.name}" loading="lazy" onerror="this.src='ab-crunch.jpg'">
-        <div class="exercise-info">
-          <h3>${ex.name}</h3>
-          <div class="meta">${ex.brand}${ex.notes ? " • " + ex.notes : ""}</div>
-          <div class="last-log">${lastText}</div>
-          <button class="log-btn" data-id="${ex.id}" data-cat="${cat}">Log Sets</button>
-        </div>
-      `;
-      container.appendChild(card);
-    });
+    // Add Exercise button at top of each tab
+    const addBar = document.createElement("div");
+    addBar.className = "add-exercise-bar";
+    addBar.innerHTML = `<button class="btn secondary add-ex-btn" data-cat="${cat}">+ Add Exercise</button>`;
+    container.appendChild(addBar);
+
+    const allEx = getAllEquipment(cat);
+    // Suggested first, then others
+    const suggested = allEx.filter(ex => suggestedIds.has(ex.id));
+    const others = allEx.filter(ex => !suggestedIds.has(ex.id));
+
+    if (suggested.length) {
+      const label = document.createElement("div");
+      label.className = "section-label";
+      label.textContent = "In today's suggestion";
+      container.appendChild(label);
+    }
+
+    suggested.forEach(ex => container.appendChild(buildExerciseCard(ex, cat, false)));
+
+    if (others.length) {
+      const label = document.createElement("div");
+      label.className = "section-label muted";
+      label.textContent = "Other exercises (tap to expand)";
+      container.appendChild(label);
+
+      others.forEach(ex => container.appendChild(buildExerciseCard(ex, cat, true)));
+    }
   });
 
   // Attach log buttons
   document.querySelectorAll(".log-btn").forEach(btn => {
-    btn.addEventListener("click", () => openLogModal(btn.dataset.id, btn.dataset.cat));
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openLogModal(btn.dataset.id, btn.dataset.cat);
+    });
   });
+
+  // Expand/collapse for minimized cards (event delegation so it keeps working after toggle)
+  document.querySelectorAll(".exercise-grid").forEach(grid => {
+    grid.onclick = (e) => {
+      const hdr = e.target.closest(".collapsed-header");
+      if (!hdr) return;
+      const card = hdr.closest(".exercise-card");
+      if (!card) return;
+      card.classList.toggle("collapsed");
+      card.classList.toggle("expanded");
+    };
+  });
+
+  // Add exercise buttons
+  document.querySelectorAll(".add-ex-btn").forEach(btn => {
+    btn.addEventListener("click", () => openAddExerciseModal(btn.dataset.cat));
+  });
+}
+
+function buildExerciseCard(ex, cat, startCollapsed) {
+  const last = getLastForExercise(ex.id);
+  let lastText = "No previous log";
+  if (last && last.sets && last.sets.length) {
+    lastText = "Last: " + last.sets.map(s => `${s.reps}@${s.weight}`).join(", ");
+  }
+
+  const card = document.createElement("div");
+  card.className = "exercise-card" + (startCollapsed ? " collapsed" : "");
+  card.dataset.id = ex.id;
+
+  if (startCollapsed) {
+    card.innerHTML = `
+      <div class="collapsed-header">
+        <span class="collapsed-name">${ex.name}</span>
+        <span class="expand-chevron">›</span>
+      </div>
+      <div class="collapsed-body">
+        <img src="${ex.img || "ab-crunch.jpg"}" alt="${ex.name}" loading="lazy" onerror="this.src='ab-crunch.jpg'">
+        <div class="exercise-info">
+          <h3>${ex.name}</h3>
+          <div class="meta">${ex.brand || "Custom"}${ex.notes ? " • " + ex.notes : ""}</div>
+          <div class="last-log">${lastText}</div>
+          <button class="log-btn" data-id="${ex.id}" data-cat="${cat}">Log Sets</button>
+        </div>
+      </div>
+    `;
+  } else {
+    card.innerHTML = `
+      <img src="${ex.img || "ab-crunch.jpg"}" alt="${ex.name}" loading="lazy" onerror="this.src='ab-crunch.jpg'">
+      <div class="exercise-info">
+        <h3>${ex.name}</h3>
+        <div class="meta">${ex.brand || "Custom"}${ex.notes ? " • " + ex.notes : ""}</div>
+        <div class="last-log">${lastText}</div>
+        <button class="log-btn" data-id="${ex.id}" data-cat="${cat}">Log Sets</button>
+      </div>
+    `;
+  }
+  return card;
 }
 
 // ===== Modal Logic =====
 function openLogModal(exId, cat) {
-  const ex = EQUIPMENT[cat].find(e => e.id === exId);
-  if (!ex) return;
+  const ex = findExercise(exId, cat);
+  if (!ex) {
+    showToast("Exercise not found");
+    return;
+  }
   currentLogExercise = { ...ex, category: cat };
+  // Always default to 3 sets
   currentSets = [{ weight: "", reps: "" }, { weight: "", reps: "" }, { weight: "", reps: "" }];
 
   // 1. Prefer the CURRENT suggested sets so you can confirm or adjust what the plan recommended
@@ -219,14 +364,15 @@ function openLogModal(exId, cat) {
 
   if (suggestedSets) {
     currentSets = suggestedSets.map(s => ({ weight: s.weight, reps: s.reps }));
-  } else if (last && last.sets.length) {
+  } else if (last && last.sets && last.sets.length) {
     currentSets = last.sets.map(s => ({ weight: s.weight, reps: s.reps }));
   }
 
   while (currentSets.length < 3) currentSets.push({ weight: "", reps: "" });
 
   document.getElementById("modal-title").textContent = `Log: ${ex.name}`;
-  document.getElementById("modal-img").src = ex.img;
+  document.getElementById("modal-img").src = ex.img || "ab-crunch.jpg";
+  document.getElementById("modal-img").onerror = function() { this.src = "ab-crunch.jpg"; };
   renderSetInputs();
   document.getElementById("log-modal").classList.remove("hidden");
 }
@@ -319,12 +465,16 @@ document.getElementById("mark-complete-btn").addEventListener("click", () => {
     return;
   }
   const hist = getHistory();
-  hist.push(activeWorkout);
-  saveHistory(hist);
+  if (workoutAlreadyInHistory(activeWorkout, hist)) {
+    showToast("This workout is already in history – skipped duplicate");
+  } else {
+    hist.push(activeWorkout);
+    saveHistory(hist);
+    showToast("Workout saved to history!");
+  }
   activeWorkout = null;
   saveDraft(); // clears the draft
   document.getElementById("mark-complete-btn").style.display = "none";
-  showToast("Workout saved to history!");
   renderSuggestion();
   renderExercises();
   renderHistory();
@@ -403,6 +553,113 @@ function renderHistory() {
   });
 }
 
+// ===== Export / Import History =====
+document.getElementById("export-history-btn").addEventListener("click", () => {
+  const payload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    fitnessHistory: getHistory(),
+    customExercises: getCustomExercises(),
+    // Optional: include draft if present
+    fitnessDraft: null
+  };
+  try {
+    const raw = localStorage.getItem("fitnessDraft");
+    if (raw) payload.fitnessDraft = JSON.parse(raw);
+  } catch {}
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const dateStr = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `fitness-history-${dateStr}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast("History exported");
+});
+
+document.getElementById("import-history-btn").addEventListener("click", () => {
+  document.getElementById("import-history-file").click();
+});
+
+document.getElementById("import-history-file").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      let history = [];
+      let customs = [];
+      let draft = null;
+
+      // Support both our export format and a bare array of workouts
+      if (Array.isArray(data)) {
+        history = data;
+      } else if (data && typeof data === "object") {
+        if (Array.isArray(data.fitnessHistory)) history = data.fitnessHistory;
+        else if (Array.isArray(data.history)) history = data.history;
+        if (Array.isArray(data.customExercises)) customs = data.customExercises;
+        if (data.fitnessDraft) draft = data.fitnessDraft;
+      }
+
+      if (!history.length && !customs.length && !draft) {
+        showToast("No valid history found in file");
+        return;
+      }
+
+      // Always merge – never replace; skip duplicates
+      const existing = getHistory();
+      let added = 0;
+      let skipped = 0;
+      history.forEach(w => {
+        if (!w || !w.date) return;
+        if (workoutAlreadyInHistory(w, existing)) {
+          skipped++;
+          return;
+        }
+        existing.push(w);
+        added++;
+      });
+      existing.sort((a, b) => new Date(a.date) - new Date(b.date));
+      saveHistory(existing);
+
+      if (customs.length) {
+        const cur = getCustomExercises();
+        const ids = new Set(cur.map(c => c.id));
+        customs.forEach(c => {
+          if (c && c.id && !ids.has(c.id)) cur.push(c);
+        });
+        saveCustomExercises(cur);
+      }
+
+      if (draft && !activeWorkout) {
+        localStorage.setItem("fitnessDraft", JSON.stringify(draft));
+        activeWorkout = draft;
+        document.getElementById("mark-complete-btn").style.display = "inline-block";
+      }
+
+      const msg = skipped
+        ? `Merged ${added} new workout(s), skipped ${skipped} duplicate(s)`
+        : `Merged ${added} new workout(s)`;
+      showToast(msg);
+
+      renderHistory();
+      renderSuggestion();
+      renderExercises();
+    } catch (err) {
+      console.error(err);
+      showToast("Import failed – invalid file");
+    }
+    // Reset file input so same file can be chosen again
+    e.target.value = "";
+  };
+  reader.readAsText(file);
+});
+
 document.getElementById("clear-history-btn").addEventListener("click", () => {
   if (confirm("Clear all workout history? This cannot be undone.")) {
     localStorage.removeItem("fitnessHistory");
@@ -421,6 +678,66 @@ document.querySelectorAll(".tab").forEach(tab => {
     tab.classList.add("active");
     document.getElementById(tab.dataset.tab).classList.add("active");
   });
+});
+
+// ===== Add Custom Exercise =====
+function openAddExerciseModal(defaultCat) {
+  document.getElementById("add-ex-name").value = "";
+  document.getElementById("add-ex-brand").value = "";
+  document.getElementById("add-ex-notes").value = "";
+  document.getElementById("add-ex-category").value = defaultCat || "upper";
+  document.getElementById("add-ex-preview").src = "";
+  document.getElementById("add-ex-preview").style.display = "none";
+  document.getElementById("add-ex-file").value = "";
+  window._pendingExImage = null;
+  document.getElementById("add-exercise-modal").classList.remove("hidden");
+}
+
+document.getElementById("add-ex-file").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 2.5 * 1024 * 1024) {
+    showToast("Image too large (max ~2.5 MB)");
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    window._pendingExImage = ev.target.result; // data URL
+    const preview = document.getElementById("add-ex-preview");
+    preview.src = window._pendingExImage;
+    preview.style.display = "block";
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById("save-new-exercise-btn").addEventListener("click", () => {
+  const name = document.getElementById("add-ex-name").value.trim();
+  const cat = document.getElementById("add-ex-category").value;
+  const brand = document.getElementById("add-ex-brand").value.trim() || "Custom";
+  const notes = document.getElementById("add-ex-notes").value.trim();
+  if (!name) {
+    showToast("Please enter an exercise name");
+    return;
+  }
+  const id = "custom-" + name.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + Date.now().toString(36);
+  const list = getCustomExercises();
+  list.push({
+    id,
+    name,
+    brand,
+    notes,
+    category: cat,
+    img: window._pendingExImage || "ab-crunch.jpg",
+    custom: true
+  });
+  saveCustomExercises(list);
+  document.getElementById("add-exercise-modal").classList.add("hidden");
+  showToast(`Added "${name}"`);
+  renderExercises();
+});
+
+document.querySelector("#add-exercise-modal .close-modal").addEventListener("click", () => {
+  document.getElementById("add-exercise-modal").classList.add("hidden");
 });
 
 // ===== Toast =====

@@ -228,6 +228,7 @@ header h1 {
 }
 
 .modal-content {
+  position: relative;
   background: var(--card);
   width: 100%;
   max-width: 640px;
@@ -338,4 +339,96 @@ header h1 {
   .exercise-info {
     flex: 1;
   }
+}
+
+/* ===== Collapsed / minimized exercise cards ===== */
+.section-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent);
+  margin: 14px 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.section-label.muted {
+  color: var(--muted);
+}
+
+.exercise-card.collapsed {
+  padding: 0;
+  overflow: hidden;
+}
+.exercise-card.collapsed .collapsed-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+.exercise-card.collapsed .collapsed-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.exercise-card.collapsed .expand-chevron {
+  color: var(--accent);
+  font-size: 1.3rem;
+}
+.exercise-card.collapsed .collapsed-body {
+  display: none;
+}
+.exercise-card.expanded .collapsed-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.exercise-card.expanded .collapsed-body {
+  display: block;
+}
+.exercise-card.expanded .expand-chevron {
+  transform: rotate(90deg);
+  color: var(--accent);
+}
+
+.add-exercise-bar {
+  margin-bottom: 8px;
+}
+.add-exercise-bar .btn {
+  width: 100%;
+}
+
+/* Form fields for Add Exercise */
+.field-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 10px 0 4px;
+}
+.text-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 1rem;
+}
+.file-input {
+  width: 100%;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.history-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.history-actions .btn {
+  flex: 1;
+  min-width: 120px;
+  text-align: center;
 }

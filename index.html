@@ -65,6 +65,11 @@
 
       <section id="history" class="tab-content">
         <h2>Workout History</h2>
+        <div class="history-actions">
+          <button id="export-history-btn" class="btn primary">Export History</button>
+          <button id="import-history-btn" class="btn secondary">Import History</button>
+          <input type="file" id="import-history-file" accept="application/json,.json" style="display:none;">
+        </div>
         <div id="history-list"></div>
         <button id="clear-history-btn" class="btn danger">Clear All History</button>
       </section>
@@ -81,6 +86,32 @@
         </div>
         <button id="add-set-btn" class="btn secondary">+ Add Set</button>
         <button id="save-log-btn" class="btn primary">Save Log</button>
+      </div>
+    </div>
+
+    <!-- Add Exercise Modal -->
+    <div id="add-exercise-modal" class="modal hidden">
+      <div class="modal-content">
+        <button class="close-modal">&times;</button>
+        <h3>Add Exercise</h3>
+        <label class="field-label">Name</label>
+        <input type="text" id="add-ex-name" placeholder="e.g. Cable Fly" class="text-input">
+        <label class="field-label">Category</label>
+        <select id="add-ex-category" class="text-input">
+          <option value="upper">Upper Body</option>
+          <option value="lower">Lower Body</option>
+          <option value="core">Core & Mobility</option>
+          <option value="aerobic">Aerobic</option>
+        </select>
+        <label class="field-label">Brand / Equipment (optional)</label>
+        <input type="text" id="add-ex-brand" placeholder="e.g. Life Fitness, Cable, Bodyweight" class="text-input">
+        <label class="field-label">Notes (optional)</label>
+        <input type="text" id="add-ex-notes" placeholder="Form cue or tip" class="text-input">
+        <label class="field-label">Photo (optional)</label>
+        <input type="file" id="add-ex-file" accept="image/*" class="file-input">
+        <img id="add-ex-preview" class="modal-img" style="display:none;margin-top:8px;">
+        <p style="font-size:0.8rem;color:var(--muted);margin:8px 0;">New exercises default to 3 sets when logging.</p>
+        <button id="save-new-exercise-btn" class="btn primary" style="width:100%;margin-top:8px;">Save Exercise</button>
       </div>
     </div>
 
