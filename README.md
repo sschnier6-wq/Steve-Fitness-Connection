@@ -56,3 +56,12 @@ Just zip everything and extract as the root of your GitHub Pages site.
 - Clearing site data or using a different browser/device will reset history.
 - Suggestion engine looks at your most recent logged top sets and proposes modest progressive overload.
 - Core section includes both machine and bodyweight/mobility options that fit your height and goals.
+
+## Add to iPhone Home Screen
+
+1. Open the app in Safari (after publishing to GitHub Pages or opening the local files).
+2. Tap the Share button (square with arrow).
+3. Scroll and tap **Add to Home Screen**.
+4. Confirm the name (“Fitness”) and tap Add.
+
+The custom icon will appear on your home screen and the app will open in standalone mode (no Safari chrome).

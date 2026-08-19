@@ -293,20 +293,64 @@ document.getElementById("start-suggested-btn").addEventListener("click", () => {
 
 // ===== History =====
 function renderHistory() {
-  const hist = getHistory().slice().reverse();
+  const hist = getHistory().slice().reverse(); // newest first
   const container = document.getElementById("history-list");
   if (!hist.length) {
     container.innerHTML = "<p style='color:var(--muted)'>No workouts logged yet.</p>";
     return;
   }
-  container.innerHTML = hist.map(w => {
-    const date = new Date(w.date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
-    const exHtml = w.exercises.map(e => {
-      const setsStr = e.sets.map(s => `${s.reps}@${s.weight}`).join(", ");
-      return `<div class="ex"><strong>${e.name}</strong><div class="sets">${setsStr}</div></div>`;
-    }).join("");
-    return `<div class="history-item"><h4>${date}</h4>${exHtml}</div>`;
+
+  // Build list of selectable workouts by date
+  let html = '<p style="color:var(--muted);font-size:0.85rem;margin-bottom:10px;">Tap a date to view that workout in detail.</p>';
+  html += hist.map((w, idx) => {
+    const d = new Date(w.date);
+    const dateStr = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+    const timeStr = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    const exerciseCount = w.exercises.length;
+    const summary = w.exercises.slice(0, 3).map(e => e.name).join(", ") + (exerciseCount > 3 ? "…" : "");
+    return `
+      <div class="history-item" data-idx="${idx}">
+        <div class="history-header" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <h4 style="margin:0;">${dateStr}</h4>
+            <div style="font-size:0.8rem;color:var(--muted);">${timeStr} • ${exerciseCount} exercise${exerciseCount !== 1 ? "s" : ""}</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-top:2px;">${summary}</div>
+          </div>
+          <span class="expand-icon" style="font-size:1.2rem;color:var(--accent);">›</span>
+        </div>
+        <div class="history-detail" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:10px;"></div>
+      </div>`;
   }).join("");
+
+  container.innerHTML = html;
+
+  // Click handlers to expand/collapse individual workouts
+  container.querySelectorAll(".history-item").forEach(item => {
+    item.querySelector(".history-header").addEventListener("click", () => {
+      const detail = item.querySelector(".history-detail");
+      const icon = item.querySelector(".expand-icon");
+      const isOpen = detail.style.display === "block";
+
+      // Close all others
+      container.querySelectorAll(".history-detail").forEach(d => d.style.display = "none");
+      container.querySelectorAll(".expand-icon").forEach(i => i.textContent = "›");
+
+      if (!isOpen) {
+        const idx = +item.dataset.idx;
+        const w = hist[idx];
+        let detailHtml = w.exercises.map(e => {
+          const setsStr = e.sets.map(s => `${s.reps} reps @ ${s.weight} lbs`).join("<br>");
+          return `<div class="ex" style="margin-bottom:10px;">
+            <strong>${e.name}</strong>
+            <div class="sets" style="margin-top:2px;">${setsStr}</div>
+          </div>`;
+        }).join("");
+        detail.innerHTML = detailHtml || "<em>No exercises recorded</em>";
+        detail.style.display = "block";
+        icon.textContent = "∨";
+      }
+    });
+  });
 }
 
 document.getElementById("clear-history-btn").addEventListener("click", () => {
