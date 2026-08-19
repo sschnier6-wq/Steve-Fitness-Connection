@@ -136,56 +136,286 @@ function loadDraft() {
 }
 
 // ===== Suggestion Engine =====
+// Muscle-group tags used to avoid redundant overlap in one session
+const EXERCISE_GROUPS = {
+  "chest-press": ["push-h", "chest"],
+  "seated-dip": ["push-h", "triceps", "chest"],
+  "shoulder-press": ["push-v", "shoulders"],
+  "seated-row": ["pull-h", "back"],
+  "fixed-pulldown": ["pull-v", "back"],
+  "triceps-extension": ["triceps"],
+  "triceps-pushdown": ["triceps"],
+  "biceps-curl": ["biceps"],
+  "db-curls": ["biceps"],
+  "leg-press": ["quads", "legs"],
+  "leg-extension": ["quads", "legs"],
+  "leg-curl": ["hams", "legs"],
+  "ab-crunch": ["abs"],
+  "single-leg-balance": ["balance"],
+  "single-leg-rdl": ["hinge", "balance"],
+  "heel-to-toe": ["balance"],
+  "worlds-greatest": ["mobility"],
+  "hip-flexor": ["mobility"],
+  "bird-dog": ["stability"],
+  "thoracic-rotation": ["mobility"],
+  "cycling": ["cardio"]
+};
+
+function groupsFor(ex) {
+  if (EXERCISE_GROUPS[ex.id]) return EXERCISE_GROUPS[ex.id];
+  // Custom exercises: infer from logType / name
+  const name = (ex.name || "").toLowerCase();
+  const tags = [];
+  if (/curl|bicep/.test(name)) tags.push("biceps");
+  if (/tricep|pushdown|extension/.test(name) && !/leg/.test(name)) tags.push("triceps");
+  if (/press|bench|chest|fly/.test(name)) tags.push("push-h", "chest");
+  if (/shoulder|overhead/.test(name)) tags.push("push-v", "shoulders");
+  if (/row/.test(name)) tags.push("pull-h", "back");
+  if (/pulldown|pull-down|lat/.test(name)) tags.push("pull-v", "back");
+  if (/leg press|squat/.test(name)) tags.push("quads", "legs");
+  if (/leg curl|hamstring/.test(name)) tags.push("hams", "legs");
+  if (/leg extension|quad/.test(name)) tags.push("quads", "legs");
+  if (/balance|single-leg/.test(name)) tags.push("balance");
+  if (/stretch|mobility|flexor|thoracic/.test(name)) tags.push("mobility");
+  if (/bird|plank|dead bug|stability/.test(name)) tags.push("stability");
+  if (/cycle|bike|cardio|run/.test(name)) tags.push("cardio");
+  if (!tags.length) {
+    if (ex.logType === "cardio") tags.push("cardio");
+    else if (ex.logType === "time" || ex.logType === "steps") tags.push("mobility");
+    else if (ex.category === "lower") tags.push("legs");
+    else if (ex.category === "core") tags.push("stability");
+    else tags.push("misc-" + (ex.id || "x"));
+  }
+  return tags;
+}
+
+function getRecentExerciseIds(limitWorkouts) {
+  const hist = getHistory();
+  const ids = new Set();
+  const start = Math.max(0, hist.length - (limitWorkouts || 2));
+  for (let i = start; i < hist.length; i++) {
+    (hist[i].exercises || []).forEach(e => { if (e.id) ids.add(e.id); });
+  }
+  return ids;
+}
+
+function progressStrengthSets(lastEx, defaults) {
+  if (!lastEx || !lastEx.sets || !lastEx.sets.length) return defaults.map(s => ({ ...s }));
+  const strengthSets = lastEx.sets.filter(s => s.weight != null || s.reps != null);
+  if (!strengthSets.length) return defaults.map(s => ({ ...s }));
+  const heaviest = strengthSets.reduce((a, b) => ((b.weight || 0) > (a.weight || 0) ? b : a), strengthSets[0]);
+  const topW = Number(heaviest.weight) || 0;
+  const topR = Number(heaviest.reps) || 6;
+  // Progressive overload: +5 lbs on top set if you hit at least 6 reps, else keep weight and nudge reps
+  let newTop = topW;
+  let newTopReps = topR;
+  if (topR >= 6) {
+    newTop = Math.round((topW + 5) / 5) * 5;
+    newTopReps = Math.max(6, Math.min(8, topR));
+  } else {
+    newTopReps = topR + 1;
+  }
+  const warm = Math.max(40, Math.round((newTop - 20) / 5) * 5);
+  const mid = Math.max(warm, Math.round((newTop - 10) / 5) * 5);
+  return [
+    { reps: 10, weight: warm },
+    { reps: 8, weight: mid },
+    { reps: newTopReps, weight: newTop }
+  ];
+}
+
+function progressTimeSets(lastEx, defaults) {
+  if (!lastEx || !lastEx.sets || !lastEx.sets.length) return defaults.map(s => ({ ...s }));
+  return lastEx.sets.map((s, i) => {
+    const base = defaults[i] || defaults[defaults.length - 1] || { duration: 30, label: "" };
+    const d = Number(s.duration != null ? s.duration : base.duration) || 30;
+    return {
+      duration: Math.min(90, d + 5),
+      label: s.label || base.label,
+      unit: s.unit || base.unit || "sec"
+    };
+  });
+}
+
+function progressRepsSets(lastEx, defaults) {
+  if (!lastEx || !lastEx.sets || !lastEx.sets.length) return defaults.map(s => ({ ...s }));
+  return lastEx.sets.map((s, i) => {
+    const base = defaults[i] || defaults[defaults.length - 1] || { reps: 10, label: "" };
+    const r = Number(s.reps != null ? s.reps : base.reps) || 10;
+    return { reps: Math.min(20, r + 1), label: s.label || base.label };
+  });
+}
+
+function progressStepsSets(lastEx, defaults) {
+  if (!lastEx || !lastEx.sets || !lastEx.sets.length) return defaults.map(s => ({ ...s }));
+  return lastEx.sets.map((s, i) => {
+    const base = defaults[i] || { steps: 10 };
+    const st = Number(s.steps != null ? s.steps : base.steps) || 10;
+    return { steps: Math.min(30, st + 2) };
+  });
+}
+
+function progressCustomSets(lastEx, defaults, ex) {
+  if (!lastEx || !lastEx.sets || !lastEx.sets.length) return defaults;
+  // Nudge numeric fields up slightly
+  return lastEx.sets.map(s => {
+    const out = { ...s };
+    if (out.v1 !== "" && out.v1 != null && !isNaN(Number(out.v1))) out.v1 = Number(out.v1) + 1;
+    if (out.weight != null) out.weight = Math.round((Number(out.weight) + 5) / 5) * 5;
+    if (out.reps != null) out.reps = Number(out.reps) + 1;
+    if (out.duration != null) out.duration = Number(out.duration) + 5;
+    return out;
+  });
+}
+
+function defaultSetsFor(ex) {
+  if (ex.defaultSets && ex.defaultSets.length) return ex.defaultSets.map(s => ({ ...s }));
+  const lt = ex.logType || "strength";
+  if (lt === "time") return [{ duration: 30, label: "", unit: "sec" }, { duration: 30, label: "", unit: "sec" }];
+  if (lt === "cardio") return [{ duration: 60, unit: "min" }];
+  if (lt === "steps") return [{ steps: 10 }, { steps: 10 }];
+  if (lt === "reps") return [{ reps: 10, label: "" }, { reps: 10, label: "" }];
+  if (lt === "custom") {
+    const cu = ex.customUnits || {};
+    return [{ v1: 10, v2: "", u1: cu.field1 || "", u2: cu.field2 || "" }, { v1: 10, v2: "", u1: cu.field1 || "", u2: cu.field2 || "" }];
+  }
+  return [{ reps: 10, weight: 50 }, { reps: 8, weight: 60 }, { reps: 6, weight: 70 }];
+}
+
+function progressedSetsFor(ex) {
+  const lastEx = getLastForExercise(ex.id);
+  const defaults = defaultSetsFor(ex);
+  const lt = ex.logType || "strength";
+  if (lt === "time" || lt === "cardio") return progressTimeSets(lastEx, defaults);
+  if (lt === "reps") return progressRepsSets(lastEx, defaults);
+  if (lt === "steps") return progressStepsSets(lastEx, defaults);
+  if (lt === "custom") return progressCustomSets(lastEx, defaults, ex);
+  return progressStrengthSets(lastEx, defaults);
+}
+
+function detailFromSets(ex, sets) {
+  const lt = ex.logType || "strength";
+  if (!sets || !sets.length) return "";
+  if (lt === "time" || lt === "cardio") {
+    const unit = sets[0].unit || (lt === "cardio" ? "min" : "sec");
+    return sets.length + " × " + sets[0].duration + unit + (sets[0].label ? " " + sets[0].label : "");
+  }
+  if (lt === "steps") return sets.length + " × " + sets[0].steps + " steps";
+  if (lt === "reps") return sets.length + " × " + sets[0].reps + " reps" + (sets[0].label ? " " + sets[0].label : "");
+  if (lt === "custom") return sets.map(s => formatSetDisplay(s, "custom", ex.customUnits)).filter(Boolean).join(" → ");
+  return sets.map(s => s.reps + "×" + s.weight).join(" → ");
+}
+
+// Pairs that should not appear together in one session (redundant or overlapping fatigue)
+const CONFLICT_PAIRS = [
+  ["fixed-pulldown", "triceps-extension"],
+  ["fixed-pulldown", "triceps-pushdown"],
+  ["triceps-extension", "triceps-pushdown"],
+  ["biceps-curl", "db-curls"],
+  ["chest-press", "seated-dip"],
+  ["leg-press", "leg-extension"] // both heavy quad bias in same session
+];
+
+function conflictsWithPicked(exId, pickedIds) {
+  for (const [a, b] of CONFLICT_PAIRS) {
+    if (exId === a && pickedIds.has(b)) return true;
+    if (exId === b && pickedIds.has(a)) return true;
+  }
+  return false;
+}
+
+function pickVaried(pool, count, recentIds, usedGroups) {
+  const scored = pool.map((ex, idx) => {
+    const tags = groupsFor(ex);
+    const conflict = tags.some(t => usedGroups.has(t));
+    const recent = recentIds.has(ex.id) ? 1 : 0;
+    const histLen = getHistory().length;
+    const rotate = (histLen + idx) % Math.max(pool.length, 1);
+    return { ex, conflict, recent, rotate, tags };
+  });
+  scored.sort((a, b) => {
+    if (a.conflict !== b.conflict) return a.conflict - b.conflict;
+    if (a.recent !== b.recent) return a.recent - b.recent;
+    return a.rotate - b.rotate;
+  });
+  const picked = [];
+  const pickedIds = new Set();
+  for (const item of scored) {
+    if (picked.length >= count) break;
+    if (item.conflict && picked.length > 0) continue;
+    if (conflictsWithPicked(item.ex.id, pickedIds)) continue;
+    picked.push(item);
+    pickedIds.add(item.ex.id);
+    item.tags.forEach(t => usedGroups.add(t));
+  }
+  if (picked.length < count) {
+    for (const item of scored) {
+      if (picked.length >= count) break;
+      if (pickedIds.has(item.ex.id)) continue;
+      if (item.tags.some(t => usedGroups.has(t))) continue;
+      if (conflictsWithPicked(item.ex.id, pickedIds)) continue;
+      picked.push(item);
+      pickedIds.add(item.ex.id);
+      item.tags.forEach(t => usedGroups.add(t));
+    }
+  }
+  return picked.map(p => p.ex);
+}
+
 function generateSuggestion() {
   const last = getLastWorkout();
+  const recentIds = getRecentExerciseIds(2);
+  const usedGroups = new Set();
   const suggestion = {
     title: "Balanced Full-Body Session",
-    focus: "Progressive strength + balance/mobility + cycling",
+    focus: last
+      ? "Progressed from your most recent workout · varied exercises for continued gains"
+      : "Progressive strength + balance/mobility + cycling",
     upper: [],
     lower: [],
     core: [],
     aerobic: "60 min steady cycling"
   };
 
-  // Simple progression: take last top set and suggest small increase or same volume
-  function suggestProgress(exId, defaultSets) {
-    const lastEx = getLastForExercise(exId);
-    if (!lastEx || !lastEx.sets.length) {
-      return defaultSets;
-    }
-    // Take the heaviest set and suggest +5-10 lbs or more reps
-    const heaviest = lastEx.sets.reduce((a, b) => (b.weight > a.weight ? b : a), lastEx.sets[0]);
-    const suggestedWeight = Math.round((heaviest.weight + 5) / 5) * 5; // round to 5
-    return [
-      { reps: 10, weight: Math.max(heaviest.weight - 20, 40) },
-      { reps: 8, weight: heaviest.weight },
-      { reps: 6, weight: suggestedWeight }
-    ];
+  const upperPool = getAllEquipment("upper");
+  const lowerPool = getAllEquipment("lower");
+  const corePool = getAllEquipment("core").filter(e => e.id !== "ab-crunch"); // prefer bodyweight unless only option
+  const aerobicPool = getAllEquipment("aerobic");
+
+  // Upper: aim for 4 exercises covering different patterns (push-h, pull-h, push-v or pull-v, arm accessory)
+  const upperPicked = pickVaried(upperPool, 4, recentIds, usedGroups);
+  suggestion.upper = upperPicked.map(ex => {
+    const sets = progressedSetsFor(ex);
+    return { id: ex.id, name: ex.name, sets, detail: detailFromSets(ex, sets) };
+  });
+
+  // Lower: 2–3 exercises, avoid double-loading same group hard
+  const lowerPicked = pickVaried(lowerPool, Math.min(3, lowerPool.length), recentIds, usedGroups);
+  suggestion.lower = lowerPicked.map(ex => {
+    const sets = progressedSetsFor(ex);
+    return { id: ex.id, name: ex.name, sets, detail: detailFromSets(ex, sets) };
+  });
+
+  // Core/mobility: 3–4 varied (balance + hinge/stability + mobility)
+  const corePicked = pickVaried(corePool.length ? corePool : getAllEquipment("core"), 4, recentIds, usedGroups);
+  suggestion.core = corePicked.map(ex => {
+    const sets = progressedSetsFor(ex);
+    return {
+      id: ex.id,
+      name: ex.name,
+      sets,
+      detail: detailFromSets(ex, sets)
+    };
+  });
+
+  // Aerobic
+  if (aerobicPool.length) {
+    const cardio = pickVaried(aerobicPool, 1, recentIds, usedGroups)[0] || aerobicPool[0];
+    const sets = progressedSetsFor(cardio);
+    const mins = (sets[0] && sets[0].duration) || 60;
+    suggestion.aerobic = mins + " min " + (cardio.name || "steady cycling");
+    suggestion.aerobicId = cardio.id;
   }
-
-  suggestion.upper = [
-    { id: "chest-press", name: "Chest Press", sets: suggestProgress("chest-press", [{reps:10,weight:110},{reps:8,weight:130},{reps:6,weight:150}]) },
-    { id: "seated-row", name: "Seated Row", sets: suggestProgress("seated-row", [{reps:10,weight:130},{reps:8,weight:130},{reps:6,weight:145}]) },
-    { id: "shoulder-press", name: "Shoulder Press", sets: suggestProgress("shoulder-press", [{reps:12,weight:50},{reps:8,weight:65},{reps:6,weight:65}]) },
-    { id: "triceps-pushdown", name: "Triceps Pushdown", sets: [{reps:12,weight:50},{reps:10,weight:60},{reps:8,weight:60}] },
-    { id: "db-curls", name: "Dumbbell Curls", sets: [{reps:12,weight:35},{reps:8,weight:40},{reps:6,weight:40}] }
-  ];
-
-  suggestion.lower = [
-    { id: "leg-press", name: "Seated Leg Press", sets: suggestProgress("leg-press", [{reps:10,weight:250},{reps:10,weight:270},{reps:10,weight:290}]) },
-    { id: "leg-curl", name: "Seated Leg Curl", sets: suggestProgress("leg-curl", [{reps:12,weight:160},{reps:10,weight:190},{reps:8,weight:205}]) },
-    { id: "leg-extension", name: "Leg Extension", sets: suggestProgress("leg-extension", [{reps:12,weight:175},{reps:10,weight:190},{reps:10,weight:205}]) }
-  ];
-
-  suggestion.core = [
-    { id: "single-leg-balance", name: "Single-Leg Balance", detail: "3 × 30s each leg", sets: [{ duration: 30, label: "each leg" }, { duration: 30, label: "each leg" }, { duration: 30, label: "each leg" }] },
-    { id: "single-leg-rdl", name: "Single-Leg RDL", detail: "2 × 10 each leg", sets: [{ reps: 10, label: "each leg" }, { reps: 10, label: "each leg" }] },
-    { id: "heel-to-toe", name: "Heel-to-Toe Walk", detail: "2 × 10 steps", sets: [{ steps: 10 }, { steps: 10 }] },
-    { id: "worlds-greatest", name: "World's Greatest Stretch", detail: "2 × 6 per side", sets: [{ reps: 6, label: "per side" }, { reps: 6, label: "per side" }] },
-    { id: "hip-flexor", name: "Hip Flexor Stretch", detail: "2 × 35s each side", sets: [{ duration: 35, label: "each side" }, { duration: 35, label: "each side" }] },
-    { id: "bird-dog", name: "Bird-Dog", detail: "2 × 10 per side", sets: [{ reps: 10, label: "per side" }, { reps: 10, label: "per side" }] },
-    { id: "thoracic-rotation", name: "Thoracic Rotations", detail: "2 × 10 per side", sets: [{ reps: 10, label: "per side" }, { reps: 10, label: "per side" }] }
-  ];
 
   return suggestion;
 }
@@ -196,17 +426,17 @@ function renderSuggestion() {
   let html = `<p><strong>${s.title}</strong><br><span style="color:var(--muted)">${s.focus}</span></p>`;
   html += `<p style="margin-top:8px"><strong>Upper</strong></p><ul>`;
   s.upper.forEach(e => {
-    const setsStr = e.sets.map(st => `${st.reps}×${st.weight}`).join(" → ");
+    const setsStr = e.detail || (e.sets || []).map(st => (st.reps != null ? st.reps + "×" + (st.weight != null ? st.weight : "") : "")).filter(Boolean).join(" → ");
     html += `<li>${e.name}: ${setsStr}</li>`;
   });
   html += `</ul><p><strong>Lower</strong></p><ul>`;
   s.lower.forEach(e => {
-    const setsStr = e.sets.map(st => `${st.reps}×${st.weight}`).join(" → ");
+    const setsStr = e.detail || (e.sets || []).map(st => (st.reps != null ? st.reps + "×" + (st.weight != null ? st.weight : "") : "")).filter(Boolean).join(" → ");
     html += `<li>${e.name}: ${setsStr}</li>`;
   });
   html += `</ul><p><strong>Core / Mobility</strong></p><ul>`;
   s.core.forEach(e => {
-    html += `<li>${e.name}: ${e.detail}</li>`;
+    html += `<li>${e.name}: ${e.detail || ""}</li>`;
   });
   html += `</ul><p><strong>Aerobic</strong>: ${s.aerobic}</p>`;
   el.innerHTML = html;
@@ -216,22 +446,11 @@ function renderSuggestion() {
 function getSuggestedIds() {
   const s = generateSuggestion();
   const ids = new Set();
-  (s.upper || []).forEach(e => ids.add(e.id));
-  (s.lower || []).forEach(e => ids.add(e.id));
-  // Core/mobility in suggestion are name-based; map common ones
-  const coreMap = {
-    "Single-Leg Balance": "single-leg-balance",
-    "Single-Leg RDL": "single-leg-rdl",
-    "Heel-to-Toe Walk": "heel-to-toe",
-    "World's Greatest Stretch": "worlds-greatest",
-    "Hip Flexor Stretch": "hip-flexor",
-    "Bird-Dog": "bird-dog",
-    "Thoracic Rotations": "thoracic-rotation"
-  };
-  (s.core || []).forEach(e => {
-    if (coreMap[e.name]) ids.add(coreMap[e.name]);
-  });
-  ids.add("cycling");
+  (s.upper || []).forEach(e => { if (e.id) ids.add(e.id); });
+  (s.lower || []).forEach(e => { if (e.id) ids.add(e.id); });
+  (s.core || []).forEach(e => { if (e.id) ids.add(e.id); });
+  if (s.aerobicId) ids.add(s.aerobicId);
+  else ids.add("cycling");
   return ids;
 }
 
