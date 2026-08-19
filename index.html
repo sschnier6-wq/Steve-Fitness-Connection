@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>Steve's Fitness Tracker</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Fitness Tracker</h1>
+      <p class="subtitle">Balanced Strength • Fitness Connection</p>
+    </header>
+
+    <!-- Suggested Workout Banner -->
+    <section id="suggestion-panel" class="card">
+      <h2>Next Workout Suggestion</h2>
+      <div id="suggestion-content">
+        <p>Loading suggestion...</p>
+      </div>
+      <button id="start-suggested-btn" class="btn primary">Start This Workout</button>
+      <button id="mark-complete-btn" class="btn secondary" style="display:none;">Mark Workout Complete</button>
+    </section>
+
+    <!-- Tabs -->
+    <nav class="tabs">
+      <button class="tab active" data-tab="upper">Upper</button>
+      <button class="tab" data-tab="lower">Lower</button>
+      <button class="tab" data-tab="core">Core</button>
+      <button class="tab" data-tab="aerobic">Aerobic</button>
+      <button class="tab" data-tab="history">History</button>
+    </nav>
+
+    <!-- Tab Contents -->
+    <main>
+      <section id="upper" class="tab-content active">
+        <h2>Upper Body</h2>
+        <div id="upper-exercises" class="exercise-grid"></div>
+      </section>
+
+      <section id="lower" class="tab-content">
+        <h2>Lower Body</h2>
+        <div id="lower-exercises" class="exercise-grid"></div>
+      </section>
+
+      <section id="core" class="tab-content">
+        <h2>Core & Mobility</h2>
+        <div id="core-exercises" class="exercise-grid"></div>
+      </section>
+
+      <section id="aerobic" class="tab-content">
+        <h2>Aerobic</h2>
+        <div id="aerobic-exercises" class="exercise-grid"></div>
+      </section>
+
+      <section id="history" class="tab-content">
+        <h2>Workout History</h2>
+        <div id="history-list"></div>
+        <button id="clear-history-btn" class="btn danger">Clear All History</button>
+      </section>
+    </main>
+
+    <!-- Log Modal -->
+    <div id="log-modal" class="modal hidden">
+      <div class="modal-content">
+        <button class="close-modal">&times;</button>
+        <h3 id="modal-title">Log Exercise</h3>
+        <img id="modal-img" src="" alt="" class="modal-img">
+        <div id="sets-container">
+          <!-- Dynamic set inputs -->
+        </div>
+        <button id="add-set-btn" class="btn secondary">+ Add Set</button>
+        <button id="save-log-btn" class="btn primary">Save Log</button>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
