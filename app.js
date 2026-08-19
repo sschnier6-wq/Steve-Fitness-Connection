@@ -18,11 +18,13 @@ const EQUIPMENT = {
   ],
   core: [
     { id: "ab-crunch", name: "Abdominal Crunch Machine", brand: "Life Fitness", img: "ab-crunch.jpg", notes: "May be uncomfortable at 6'7\" – prefer alternatives" },
-    { id: "bird-dog", name: "Bird-Dog", brand: "Bodyweight", img: "ab-crunch.jpg", notes: "Core stability + balance" },
-    { id: "single-leg-balance", name: "Single-Leg Balance", brand: "Bodyweight", img: "ab-crunch.jpg", notes: "30s holds, progress to eyes closed" },
-    { id: "single-leg-rdl", name: "Single-Leg RDL", brand: "Bodyweight", img: "ab-crunch.jpg", notes: "Slow & controlled" },
-    { id: "worlds-greatest", name: "World's Greatest Stretch", brand: "Mobility", img: "ab-crunch.jpg", notes: "Hip + thoracic mobility" },
-    { id: "hip-flexor", name: "Half-Kneeling Hip Flexor Stretch", brand: "Mobility", img: "ab-crunch.jpg", notes: "30-40s per side" }
+    { id: "single-leg-balance", name: "Single-Leg Balance", brand: "Bodyweight", img: "single-leg-balance.jpg", notes: "3 × 30s holds per leg, progress to eyes closed" },
+    { id: "single-leg-rdl", name: "Single-Leg Romanian Deadlift", brand: "Bodyweight", img: "single-leg-rdl.jpg", notes: "2 × 8-10 slow reps per leg" },
+    { id: "heel-to-toe", name: "Heel-to-Toe Walk", brand: "Balance", img: "heel-to-toe.jpg", notes: "2 × 10 steps" },
+    { id: "worlds-greatest", name: "World's Greatest Stretch", brand: "Mobility", img: "worlds-greatest-stretch.jpg", notes: "2 sets of 5-6 per side" },
+    { id: "hip-flexor", name: "Half-Kneeling Hip Flexor Stretch", brand: "Mobility", img: "hip-flexor-stretch.jpg", notes: "2 × 30-40s per side" },
+    { id: "bird-dog", name: "Bird-Dog", brand: "Bodyweight", img: "bird-dog.jpg", notes: "2 × 8-10 per side" },
+    { id: "thoracic-rotation", name: "Thoracic Rotations (Quadruped)", brand: "Mobility", img: "thoracic-rotation.jpg", notes: "2 × 8-10 per side" }
   ],
   aerobic: [
     { id: "cycling", name: "Stationary Cycling", brand: "Cardio", img: "exercise-bike.jpg", notes: "Steady aerobic 45-60 min preferred" }
@@ -106,9 +108,11 @@ function generateSuggestion() {
   suggestion.core = [
     { name: "Single-Leg Balance", detail: "3 × 30s each leg" },
     { name: "Single-Leg RDL", detail: "2 × 10 each leg" },
+    { name: "Heel-to-Toe Walk", detail: "2 × 10 steps" },
     { name: "World's Greatest Stretch", detail: "2 sets per side" },
     { name: "Hip Flexor Stretch", detail: "2 × 30-40s each side" },
-    { name: "Bird-Dog", detail: "2 sets of 8-10/side" }
+    { name: "Bird-Dog", detail: "2 × 8-10 per side" },
+    { name: "Thoracic Rotations", detail: "2 × 8-10 per side" }
   ];
 
   return suggestion;
