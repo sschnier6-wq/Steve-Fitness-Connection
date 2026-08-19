@@ -205,12 +205,25 @@ function openLogModal(exId, cat) {
   currentLogExercise = { ...ex, category: cat };
   currentSets = [{ weight: "", reps: "" }, { weight: "", reps: "" }, { weight: "", reps: "" }];
 
-  // Prefill from last if available
-  const last = getLastForExercise(exId);
-  if (last && last.sets.length) {
-    currentSets = last.sets.map(s => ({ weight: s.weight, reps: s.reps }));
-    while (currentSets.length < 3) currentSets.push({ weight: "", reps: "" });
+  // 1. Prefer the CURRENT suggested sets so you can confirm or adjust what the plan recommended
+  const suggestion = generateSuggestion();
+  let suggestedSets = null;
+  const allSuggested = [...(suggestion.upper || []), ...(suggestion.lower || [])];
+  const match = allSuggested.find(s => s.id === exId);
+  if (match && match.sets && match.sets.length) {
+    suggestedSets = match.sets;
   }
+
+  // 2. Fall back to last logged values if no suggestion exists for this exercise
+  const last = getLastForExercise(exId);
+
+  if (suggestedSets) {
+    currentSets = suggestedSets.map(s => ({ weight: s.weight, reps: s.reps }));
+  } else if (last && last.sets.length) {
+    currentSets = last.sets.map(s => ({ weight: s.weight, reps: s.reps }));
+  }
+
+  while (currentSets.length < 3) currentSets.push({ weight: "", reps: "" });
 
   document.getElementById("modal-title").textContent = `Log: ${ex.name}`;
   document.getElementById("modal-img").src = ex.img;
