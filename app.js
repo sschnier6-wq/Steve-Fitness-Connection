@@ -274,6 +274,24 @@ function renderExercises() {
     });
   });
 
+  // Delete custom exercise (with confirmation)
+  document.querySelectorAll(".delete-ex-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      const list = getCustomExercises();
+      const found = list.find(x => x.id === id);
+      const label = found ? found.name : "this exercise";
+      if (!confirmClear(`Delete "${label}"?\nIt will be removed from your exercise list. Past workout history is not changed.`)) {
+        showToast("Delete cancelled");
+        return;
+      }
+      saveCustomExercises(list.filter(x => x.id !== id));
+      renderExercises();
+      showToast(`Deleted "${label}"`);
+    });
+  });
+
   // Expand/collapse for minimized cards (event delegation so it keeps working after toggle)
   document.querySelectorAll(".exercise-grid").forEach(grid => {
     grid.onclick = (e) => {
@@ -314,6 +332,7 @@ function buildExerciseCard(ex, cat, startCollapsed) {
           <div class="meta">${ex.brand || "Custom"}${ex.notes ? " • " + ex.notes : ""}</div>
           <div class="last-log">${lastText}</div>
           <button class="log-btn" data-id="${ex.id}" data-cat="${cat}">Log Sets</button>
+          ${ex.custom ? `<button class="btn danger delete-ex-btn" data-id="${ex.id}" style="margin-top:6px;width:100%;">Delete Exercise</button>` : ""}
         </div>
       </div>
     `;
@@ -325,6 +344,7 @@ function buildExerciseCard(ex, cat, startCollapsed) {
         <div class="meta">${ex.brand || "Custom"}${ex.notes ? " • " + ex.notes : ""}</div>
         <div class="last-log">${lastText}</div>
         <button class="log-btn" data-id="${ex.id}" data-cat="${cat}">Log Sets</button>
+        ${ex.custom ? `<button class="btn danger delete-ex-btn" data-id="${ex.id}" style="margin-top:6px;width:100%;">Delete Exercise</button>` : ""}
       </div>
     `;
   }
@@ -596,6 +616,7 @@ function setWorkoutActiveUI(startIso) {
   const status = document.getElementById("workout-status");
   const startBtn = document.getElementById("start-suggested-btn");
   const completeBtn = document.getElementById("mark-complete-btn");
+  const cancelBtn = document.getElementById("cancel-workout-btn");
 
   panel.classList.add("workout-active");
   startBtn.classList.add("workout-running");
@@ -603,6 +624,7 @@ function setWorkoutActiveUI(startIso) {
   startBtn.disabled = true;
   completeBtn.style.display = "inline-block";
   completeBtn.classList.add("btn-active-complete");
+  if (cancelBtn) cancelBtn.style.display = "inline-block";
   status.className = "workout-status active";
   status.textContent = "Started: " + formatDateTime(startIso);
 }
@@ -630,6 +652,7 @@ function setWorkoutIdleUI() {
   const status = document.getElementById("workout-status");
   const startBtn = document.getElementById("start-suggested-btn");
   const completeBtn = document.getElementById("mark-complete-btn");
+  const cancelBtn = document.getElementById("cancel-workout-btn");
 
   panel.classList.remove("workout-active");
   startBtn.classList.remove("workout-running");
@@ -637,6 +660,7 @@ function setWorkoutIdleUI() {
   startBtn.disabled = false;
   completeBtn.style.display = "none";
   completeBtn.classList.remove("btn-active-complete");
+  if (cancelBtn) cancelBtn.style.display = "none";
   // leave any completed message; clear only if empty
   if (!status.textContent || status.classList.contains("active")) {
     status.className = "workout-status";
@@ -689,6 +713,25 @@ document.getElementById("start-suggested-btn").addEventListener("click", () => {
   setWorkoutActiveUI(startIso);
   showToast("Workout started – log your sets as you go");
   document.querySelector('.tab[data-tab="upper"]').click();
+});
+
+document.getElementById("cancel-workout-btn").addEventListener("click", () => {
+  const hasLogs = activeWorkout && activeWorkout.exercises && activeWorkout.exercises.length;
+  const msg = hasLogs
+    ? "Cancel this workout and discard all sets logged so far?\nThis cannot be undone."
+    : "Cancel this workout? Nothing has been logged yet.";
+  if (!confirmClear(msg)) {
+    showToast("Cancel aborted – workout still active");
+    return;
+  }
+  activeWorkout = null;
+  saveDraft();
+  setWorkoutIdleUI();
+  const status = document.getElementById("workout-status");
+  status.className = "workout-status";
+  status.textContent = "";
+  renderExercises();
+  showToast("In-progress workout cleared");
 });
 
 // ===== History =====
@@ -862,14 +905,21 @@ document.getElementById("import-history-file").addEventListener("change", (e) =>
   reader.readAsText(file);
 });
 
+/** Confirm before any irreversible data clear. Returns true if user chose Yes. */
+function confirmClear(message) {
+  return window.confirm(message + "\n\nTap OK for Yes, Cancel for No.");
+}
+
 document.getElementById("clear-history-btn").addEventListener("click", () => {
-  if (confirm("Clear all workout history? This cannot be undone.")) {
-    localStorage.removeItem("fitnessHistory");
-    renderHistory();
-    renderSuggestion();
-    renderExercises();
-    showToast("History cleared");
+  if (!confirmClear("Clear ALL workout history?\nThis permanently deletes every saved workout and cannot be undone.")) {
+    showToast("Clear cancelled");
+    return;
   }
+  localStorage.removeItem("fitnessHistory");
+  renderHistory();
+  renderSuggestion();
+  renderExercises();
+  showToast("History cleared");
 });
 
 // ===== Tabs =====
