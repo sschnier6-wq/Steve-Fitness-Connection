@@ -17,17 +17,17 @@ const EQUIPMENT = {
     { id: "leg-extension", name: "Leg Extension", brand: "Life Fitness", img: "leg-extension.jpg", notes: "Quad focus" }
   ],
   core: [
-    { id: "ab-crunch", name: "Abdominal Crunch Machine", brand: "Life Fitness", img: "ab-crunch.jpg", notes: "May be uncomfortable at 6'7\" – prefer alternatives" },
-    { id: "single-leg-balance", name: "Single-Leg Balance", brand: "Bodyweight", img: "single-leg-balance.jpg", notes: "3 × 30s holds per leg, progress to eyes closed" },
-    { id: "single-leg-rdl", name: "Single-Leg Romanian Deadlift", brand: "Bodyweight", img: "single-leg-rdl.jpg", notes: "2 × 8-10 slow reps per leg" },
-    { id: "heel-to-toe", name: "Heel-to-Toe Walk", brand: "Balance", img: "heel-to-toe.jpg", notes: "2 × 10 steps" },
-    { id: "worlds-greatest", name: "World's Greatest Stretch", brand: "Mobility", img: "worlds-greatest-stretch.jpg", notes: "2 sets of 5-6 per side" },
-    { id: "hip-flexor", name: "Half-Kneeling Hip Flexor Stretch", brand: "Mobility", img: "hip-flexor-stretch.jpg", notes: "2 × 30-40s per side" },
-    { id: "bird-dog", name: "Bird-Dog", brand: "Bodyweight", img: "bird-dog.jpg", notes: "2 × 8-10 per side" },
-    { id: "thoracic-rotation", name: "Thoracic Rotations (Quadruped)", brand: "Mobility", img: "thoracic-rotation.jpg", notes: "2 × 8-10 per side" }
+    { id: "ab-crunch", name: "Abdominal Crunch Machine", brand: "Life Fitness", img: "ab-crunch.jpg", notes: "May be uncomfortable at 6'7\" – prefer alternatives", logType: "strength" },
+    { id: "single-leg-balance", name: "Single-Leg Balance", brand: "Bodyweight", img: "single-leg-balance.jpg", notes: "3 × 30s holds per leg", logType: "time", defaultSets: [{ duration: 30, label: "each leg" }, { duration: 30, label: "each leg" }, { duration: 30, label: "each leg" }] },
+    { id: "single-leg-rdl", name: "Single-Leg Romanian Deadlift", brand: "Bodyweight", img: "single-leg-rdl.jpg", notes: "2 × 8-10 slow reps per leg", logType: "reps", defaultSets: [{ reps: 10, label: "each leg" }, { reps: 10, label: "each leg" }] },
+    { id: "heel-to-toe", name: "Heel-to-Toe Walk", brand: "Balance", img: "heel-to-toe.jpg", notes: "2 × 10 steps", logType: "steps", defaultSets: [{ steps: 10 }, { steps: 10 }] },
+    { id: "worlds-greatest", name: "World's Greatest Stretch", brand: "Mobility", img: "worlds-greatest-stretch.jpg", notes: "2 sets of 5-6 per side", logType: "reps", defaultSets: [{ reps: 6, label: "per side" }, { reps: 6, label: "per side" }] },
+    { id: "hip-flexor", name: "Half-Kneeling Hip Flexor Stretch", brand: "Mobility", img: "hip-flexor-stretch.jpg", notes: "2 × 30-40s per side", logType: "time", defaultSets: [{ duration: 35, label: "each side" }, { duration: 35, label: "each side" }] },
+    { id: "bird-dog", name: "Bird-Dog", brand: "Bodyweight", img: "bird-dog.jpg", notes: "2 × 8-10 per side", logType: "reps", defaultSets: [{ reps: 10, label: "per side" }, { reps: 10, label: "per side" }] },
+    { id: "thoracic-rotation", name: "Thoracic Rotations (Quadruped)", brand: "Mobility", img: "thoracic-rotation.jpg", notes: "2 × 8-10 per side", logType: "reps", defaultSets: [{ reps: 10, label: "per side" }, { reps: 10, label: "per side" }] }
   ],
   aerobic: [
-    { id: "cycling", name: "Stationary Cycling", brand: "Cardio", img: "exercise-bike.jpg", notes: "Steady aerobic 45-60 min preferred" }
+    { id: "cycling", name: "Stationary Cycling", brand: "Cardio", img: "exercise-bike.jpg", notes: "Steady aerobic 45-60 min preferred", logType: "cardio", defaultSets: [{ duration: 60, unit: "min" }] }
   ]
 };
 
@@ -178,13 +178,13 @@ function generateSuggestion() {
   ];
 
   suggestion.core = [
-    { name: "Single-Leg Balance", detail: "3 × 30s each leg" },
-    { name: "Single-Leg RDL", detail: "2 × 10 each leg" },
-    { name: "Heel-to-Toe Walk", detail: "2 × 10 steps" },
-    { name: "World's Greatest Stretch", detail: "2 sets per side" },
-    { name: "Hip Flexor Stretch", detail: "2 × 30-40s each side" },
-    { name: "Bird-Dog", detail: "2 × 8-10 per side" },
-    { name: "Thoracic Rotations", detail: "2 × 8-10 per side" }
+    { id: "single-leg-balance", name: "Single-Leg Balance", detail: "3 × 30s each leg", sets: [{ duration: 30, label: "each leg" }, { duration: 30, label: "each leg" }, { duration: 30, label: "each leg" }] },
+    { id: "single-leg-rdl", name: "Single-Leg RDL", detail: "2 × 10 each leg", sets: [{ reps: 10, label: "each leg" }, { reps: 10, label: "each leg" }] },
+    { id: "heel-to-toe", name: "Heel-to-Toe Walk", detail: "2 × 10 steps", sets: [{ steps: 10 }, { steps: 10 }] },
+    { id: "worlds-greatest", name: "World's Greatest Stretch", detail: "2 × 6 per side", sets: [{ reps: 6, label: "per side" }, { reps: 6, label: "per side" }] },
+    { id: "hip-flexor", name: "Hip Flexor Stretch", detail: "2 × 35s each side", sets: [{ duration: 35, label: "each side" }, { duration: 35, label: "each side" }] },
+    { id: "bird-dog", name: "Bird-Dog", detail: "2 × 10 per side", sets: [{ reps: 10, label: "per side" }, { reps: 10, label: "per side" }] },
+    { id: "thoracic-rotation", name: "Thoracic Rotations", detail: "2 × 10 per side", sets: [{ reps: 10, label: "per side" }, { reps: 10, label: "per side" }] }
   ];
 
   return suggestion;
@@ -302,7 +302,8 @@ function buildExerciseCard(ex, cat, startCollapsed) {
   const last = getLastForExercise(ex.id);
   let lastText = "No previous log";
   if (last && last.sets && last.sets.length) {
-    lastText = "Last: " + last.sets.map(s => `${s.reps}@${s.weight}`).join(", ");
+    const lt = ex.logType || "strength";
+    lastText = "Last: " + last.sets.map(s => formatSetDisplay(s, lt)).filter(Boolean).join(", ");
   }
 
   const card = document.createElement("div");
@@ -340,6 +341,27 @@ function buildExerciseCard(ex, cat, startCollapsed) {
 }
 
 // ===== Modal Logic =====
+function formatSetDisplay(set, logType) {
+  if (!set) return "";
+  logType = logType || "strength";
+  if (logType === "time" || logType === "cardio") {
+    const unit = set.unit || (logType === "cardio" ? "min" : "sec");
+    const d = set.duration != null ? set.duration : set.reps;
+    const label = set.label ? " " + set.label : "";
+    return d + unit + label;
+  }
+  if (logType === "steps") {
+    return (set.steps != null ? set.steps : set.reps) + " steps";
+  }
+  if (logType === "reps") {
+    const label = set.label ? " " + set.label : "";
+    return (set.reps != null ? set.reps : "") + " reps" + label;
+  }
+  // strength
+  if (set.weight != null && set.reps != null) return set.reps + "@" + set.weight;
+  return "";
+}
+
 function openLogModal(exId, cat) {
   const ex = findExercise(exId, cat);
   if (!ex) {
@@ -347,28 +369,46 @@ function openLogModal(exId, cat) {
     return;
   }
   currentLogExercise = { ...ex, category: cat };
-  // Always default to 3 sets
-  currentSets = [{ weight: "", reps: "" }, { weight: "", reps: "" }, { weight: "", reps: "" }];
+  const logType = ex.logType || "strength";
 
-  // 1. Prefer the CURRENT suggested sets so you can confirm or adjust what the plan recommended
+  // Empty defaults by type
+  const emptySet = () => {
+    if (logType === "time" || logType === "cardio") return { duration: "", label: "", unit: logType === "cardio" ? "min" : "sec" };
+    if (logType === "steps") return { steps: "" };
+    if (logType === "reps") return { reps: "", label: "" };
+    return { weight: "", reps: "" };
+  };
+  currentSets = [emptySet(), emptySet(), emptySet()];
+
+  // 1. Prefer suggested sets (including core)
   const suggestion = generateSuggestion();
   let suggestedSets = null;
-  const allSuggested = [...(suggestion.upper || []), ...(suggestion.lower || [])];
+  const allSuggested = [
+    ...(suggestion.upper || []),
+    ...(suggestion.lower || []),
+    ...(suggestion.core || [])
+  ];
+  // aerobic suggestion is a string; use equipment defaults
   const match = allSuggested.find(s => s.id === exId);
   if (match && match.sets && match.sets.length) {
     suggestedSets = match.sets;
+  } else if (ex.defaultSets && ex.defaultSets.length) {
+    suggestedSets = ex.defaultSets;
   }
 
-  // 2. Fall back to last logged values if no suggestion exists for this exercise
+  // 2. Fall back to last logged
   const last = getLastForExercise(exId);
 
   if (suggestedSets) {
-    currentSets = suggestedSets.map(s => ({ weight: s.weight, reps: s.reps }));
+    currentSets = suggestedSets.map(s => ({ ...emptySet(), ...s }));
   } else if (last && last.sets && last.sets.length) {
-    currentSets = last.sets.map(s => ({ weight: s.weight, reps: s.reps }));
+    currentSets = last.sets.map(s => ({ ...emptySet(), ...s }));
   }
 
-  while (currentSets.length < 3) currentSets.push({ weight: "", reps: "" });
+  // Keep suggested count (don't force 3 for time/reps holds)
+  if (logType === "strength" && currentSets.length < 3) {
+    while (currentSets.length < 3) currentSets.push(emptySet());
+  }
 
   document.getElementById("modal-title").textContent = `Log: ${ex.name}`;
   document.getElementById("modal-img").src = ex.img || "ab-crunch.jpg";
@@ -380,18 +420,41 @@ function openLogModal(exId, cat) {
 function renderSetInputs() {
   const container = document.getElementById("sets-container");
   container.innerHTML = "";
+  const logType = (currentLogExercise && currentLogExercise.logType) || "strength";
+
   currentSets.forEach((set, i) => {
     const row = document.createElement("div");
     row.className = "set-row";
-    row.innerHTML = `
-      <label>Set ${i + 1}</label>
-      <input type="number" placeholder="lbs" value="${set.weight}" data-idx="${i}" data-field="weight" inputmode="numeric">
-      <input type="number" placeholder="reps" value="${set.reps}" data-idx="${i}" data-field="reps" inputmode="numeric">
-    `;
+    let fields = "";
+    if (logType === "time") {
+      fields = `
+        <input type="number" placeholder="sec" value="${set.duration != null ? set.duration : ""}" data-idx="${i}" data-field="duration" inputmode="numeric">
+        <input type="text" placeholder="label (e.g. each leg)" value="${set.label || ""}" data-idx="${i}" data-field="label">
+      `;
+    } else if (logType === "cardio") {
+      fields = `
+        <input type="number" placeholder="minutes" value="${set.duration != null ? set.duration : ""}" data-idx="${i}" data-field="duration" inputmode="numeric">
+        <span style="color:var(--muted);font-size:0.85rem;">min</span>
+      `;
+    } else if (logType === "steps") {
+      fields = `
+        <input type="number" placeholder="steps" value="${set.steps != null ? set.steps : ""}" data-idx="${i}" data-field="steps" inputmode="numeric">
+      `;
+    } else if (logType === "reps") {
+      fields = `
+        <input type="number" placeholder="reps" value="${set.reps != null ? set.reps : ""}" data-idx="${i}" data-field="reps" inputmode="numeric">
+        <input type="text" placeholder="label (e.g. per side)" value="${set.label || ""}" data-idx="${i}" data-field="label">
+      `;
+    } else {
+      fields = `
+        <input type="number" placeholder="lbs" value="${set.weight != null ? set.weight : ""}" data-idx="${i}" data-field="weight" inputmode="numeric">
+        <input type="number" placeholder="reps" value="${set.reps != null ? set.reps : ""}" data-idx="${i}" data-field="reps" inputmode="numeric">
+      `;
+    }
+    row.innerHTML = `<label>Set ${i + 1}</label>${fields}`;
     container.appendChild(row);
   });
 
-  // Live update
   container.querySelectorAll("input").forEach(inp => {
     inp.addEventListener("input", e => {
       const idx = +e.target.dataset.idx;
@@ -402,25 +465,45 @@ function renderSetInputs() {
 }
 
 document.getElementById("add-set-btn").addEventListener("click", () => {
-  currentSets.push({ weight: "", reps: "" });
+  const logType = (currentLogExercise && currentLogExercise.logType) || "strength";
+  if (logType === "time" || logType === "cardio") currentSets.push({ duration: "", label: "", unit: logType === "cardio" ? "min" : "sec" });
+  else if (logType === "steps") currentSets.push({ steps: "" });
+  else if (logType === "reps") currentSets.push({ reps: "", label: "" });
+  else currentSets.push({ weight: "", reps: "" });
   renderSetInputs();
 });
 
 document.getElementById("save-log-btn").addEventListener("click", () => {
-  // Re-read current values from the live inputs in case of any sync issues
-  const inputs = document.querySelectorAll("#sets-container input");
+  const logType = (currentLogExercise && currentLogExercise.logType) || "strength";
+  const rows = document.querySelectorAll("#sets-container .set-row");
   const tempSets = [];
-  for (let i = 0; i < inputs.length; i += 2) {
-    const w = inputs[i].value.trim();
-    const r = inputs[i+1] ? inputs[i+1].value.trim() : "";
-    // Allow weight-only machines OR bodyweight (reps only → weight 0)
-    if (r !== "") {
-      tempSets.push({ weight: w !== "" ? Number(w) : 0, reps: Number(r) });
-    } else if (w !== "") {
-      // weight entered but no reps – still keep as 1 rep so nothing is lost
-      tempSets.push({ weight: Number(w), reps: 1 });
+
+  rows.forEach(row => {
+    const inputs = row.querySelectorAll("input");
+    if (logType === "time" || logType === "cardio") {
+      const d = inputs[0] ? inputs[0].value.trim() : "";
+      const label = inputs[1] ? inputs[1].value.trim() : "";
+      if (d !== "") {
+        tempSets.push({
+          duration: Number(d),
+          unit: logType === "cardio" ? "min" : "sec",
+          label: label || undefined
+        });
+      }
+    } else if (logType === "steps") {
+      const s = inputs[0] ? inputs[0].value.trim() : "";
+      if (s !== "") tempSets.push({ steps: Number(s) });
+    } else if (logType === "reps") {
+      const r = inputs[0] ? inputs[0].value.trim() : "";
+      const label = inputs[1] ? inputs[1].value.trim() : "";
+      if (r !== "") tempSets.push({ reps: Number(r), label: label || undefined });
+    } else {
+      const w = inputs[0] ? inputs[0].value.trim() : "";
+      const r = inputs[1] ? inputs[1].value.trim() : "";
+      if (r !== "") tempSets.push({ weight: w !== "" ? Number(w) : 0, reps: Number(r) });
+      else if (w !== "") tempSets.push({ weight: Number(w), reps: 1 });
     }
-  }
+  });
 
   if (!tempSets.length) {
     showToast("Enter at least one set");
@@ -620,7 +703,8 @@ function renderHistory() {
         const idx = +item.dataset.idx;
         const w = hist[idx];
         let detailHtml = w.exercises.map(e => {
-          const setsStr = e.sets.map(s => `${s.reps} reps @ ${s.weight} lbs`).join("<br>");
+          const lt = (findExercise(e.id, e.category) || {}).logType || "strength";
+          const setsStr = e.sets.map(s => formatSetDisplay(s, lt) || `${s.reps || ""}@${s.weight || ""}`).join("<br>");
           return `<div class="ex" style="margin-bottom:10px;">
             <strong>${e.name}</strong>
             <div class="sets" style="margin-top:2px;">${setsStr}</div>
