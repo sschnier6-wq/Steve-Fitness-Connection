@@ -955,29 +955,32 @@ document.getElementById("cancel-workout-btn").addEventListener("click", () => {
 
 // ===== History =====
 function renderHistory() {
-  const hist = getHistory().slice().reverse(); // newest first
+  const fullHist = getHistory();
+  const hist = fullHist.slice().reverse(); // newest first (display only)
   const container = document.getElementById("history-list");
   if (!hist.length) {
     container.innerHTML = "<p style='color:var(--muted)'>No workouts logged yet.</p>";
     return;
   }
 
-  // Build list of selectable workouts by date
-  let html = '<p style="color:var(--muted);font-size:0.85rem;margin-bottom:10px;">Tap a date to view that workout in detail.</p>';
+  let html = '<p style="color:var(--muted);font-size:0.85rem;margin-bottom:10px;">Tap a date to view details. Use Delete to remove one workout.</p>';
   html += hist.map((w, idx) => {
     const d = new Date(w.date);
     const dateStr = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
     const timeStr = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-    const exerciseCount = w.exercises.length;
-    const summary = w.exercises.slice(0, 3).map(e => e.name).join(", ") + (exerciseCount > 3 ? "…" : "");
+    const exerciseCount = (w.exercises || []).length;
+    const summary = (w.exercises || []).slice(0, 3).map(e => e.name).join(", ") + (exerciseCount > 3 ? "…" : "");
+    // Encode date for safe attribute use
+    const dateKey = encodeURIComponent(w.date || "");
     return `
-      <div class="history-item" data-idx="${idx}">
-        <div class="history-header" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
-          <div>
+      <div class="history-item" data-idx="${idx}" data-date="${dateKey}">
+        <div class="history-header" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <div style="flex:1;min-width:0;">
             <h4 style="margin:0;">${dateStr}</h4>
             <div style="font-size:0.8rem;color:var(--muted);">${timeStr} • ${exerciseCount} exercise${exerciseCount !== 1 ? "s" : ""}</div>
             <div style="font-size:0.8rem;color:var(--muted);margin-top:2px;">${summary}</div>
           </div>
+          <button type="button" class="btn danger delete-workout-btn" data-date="${dateKey}" style="flex-shrink:0;padding:6px 10px;font-size:0.8rem;">Delete</button>
           <span class="expand-icon" style="font-size:1.2rem;color:var(--accent);">›</span>
         </div>
         <div class="history-detail" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:10px;"></div>
@@ -986,24 +989,26 @@ function renderHistory() {
 
   container.innerHTML = html;
 
-  // Click handlers to expand/collapse individual workouts
+  // Expand / collapse
   container.querySelectorAll(".history-item").forEach(item => {
-    item.querySelector(".history-header").addEventListener("click", () => {
+    item.querySelector(".history-header").addEventListener("click", (e) => {
+      // Don't expand when Delete was clicked
+      if (e.target.closest(".delete-workout-btn")) return;
+
       const detail = item.querySelector(".history-detail");
       const icon = item.querySelector(".expand-icon");
       const isOpen = detail.style.display === "block";
 
-      // Close all others
       container.querySelectorAll(".history-detail").forEach(d => d.style.display = "none");
       container.querySelectorAll(".expand-icon").forEach(i => i.textContent = "›");
 
       if (!isOpen) {
         const idx = +item.dataset.idx;
         const w = hist[idx];
-        let detailHtml = w.exercises.map(e => {
+        let detailHtml = (w.exercises || []).map(e => {
           const found = findExercise(e.id, e.category) || {};
           const lt = found.logType || "strength";
-          const setsStr = e.sets.map(s => formatSetDisplay(s, lt, found.customUnits) || `${s.reps || ""}@${s.weight || ""}`).join("<br>");
+          const setsStr = (e.sets || []).map(s => formatSetDisplay(s, lt, found.customUnits) || `${s.reps || ""}@${s.weight || ""}`).join("<br>");
           return `<div class="ex" style="margin-bottom:10px;">
             <strong>${e.name}</strong>
             <div class="sets" style="margin-top:2px;">${setsStr}</div>
@@ -1013,6 +1018,32 @@ function renderHistory() {
         detail.style.display = "block";
         icon.textContent = "∨";
       }
+    });
+  });
+
+  // Delete individual workout (with confirmation)
+  container.querySelectorAll(".delete-workout-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const dateKey = decodeURIComponent(btn.dataset.date || "");
+      const match = fullHist.find(w => w.date === dateKey);
+      let label = "this workout";
+      if (match && match.date) {
+        const d = new Date(match.date);
+        label = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })
+          + " " + d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+      }
+      if (!confirmClear(`Delete the workout from ${label}?\nThis cannot be undone.`)) {
+        showToast("Delete cancelled");
+        return;
+      }
+      const next = fullHist.filter(w => w.date !== dateKey);
+      saveHistory(next);
+      renderHistory();
+      renderSuggestion();
+      renderExercises();
+      showToast("Workout deleted");
     });
   });
 }
