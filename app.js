@@ -55,12 +55,37 @@ function getLastWorkout() {
 }
 
 function getLastForExercise(exerciseId) {
+  // Prefer the current in-progress workout so the card updates immediately after Save Log
+  if (activeWorkout && activeWorkout.exercises) {
+    const found = activeWorkout.exercises.find(e => e.id === exerciseId);
+    if (found) return found;
+  }
+  // Fall back to permanent history
   const hist = getHistory();
   for (let i = hist.length - 1; i >= 0; i--) {
     const found = hist[i].exercises.find(e => e.id === exerciseId);
     if (found) return found;
   }
   return null;
+}
+
+function saveDraft() {
+  if (activeWorkout) {
+    localStorage.setItem("fitnessDraft", JSON.stringify(activeWorkout));
+  } else {
+    localStorage.removeItem("fitnessDraft");
+  }
+}
+
+function loadDraft() {
+  try {
+    const raw = localStorage.getItem("fitnessDraft");
+    if (raw) {
+      activeWorkout = JSON.parse(raw);
+      return true;
+    }
+  } catch {}
+  return false;
 }
 
 // ===== Suggestion Engine =====
@@ -223,16 +248,23 @@ document.getElementById("add-set-btn").addEventListener("click", () => {
 });
 
 document.getElementById("save-log-btn").addEventListener("click", () => {
-  const validSets = currentSets
-    .filter(s => s.weight !== "" && s.reps !== "")
-    .map(s => ({ weight: +s.weight, reps: +s.reps }));
+  // Re-read current values from the live inputs in case of any sync issues
+  const inputs = document.querySelectorAll("#sets-container input");
+  const tempSets = [];
+  for (let i = 0; i < inputs.length; i += 2) {
+    const w = inputs[i].value.trim();
+    const r = inputs[i+1] ? inputs[i+1].value.trim() : "";
+    if (w !== "" && r !== "") {
+      tempSets.push({ weight: Number(w), reps: Number(r) });
+    }
+  }
 
-  if (!validSets.length) {
-    showToast("Enter at least one set");
+  if (!tempSets.length) {
+    showToast("Enter at least one set (weight + reps)");
     return;
   }
 
-  // Add to today's active workout or create new
+  // Create or update active workout
   if (!activeWorkout) {
     activeWorkout = {
       date: new Date().toISOString(),
@@ -240,26 +272,26 @@ document.getElementById("save-log-btn").addEventListener("click", () => {
     };
   }
 
-  // Replace if already logged this exercise today
-  const existingIdx = activeWorkout.exercises.findIndex(e => e.id === currentLogExercise.id);
   const entry = {
     id: currentLogExercise.id,
     name: currentLogExercise.name,
     category: currentLogExercise.category,
-    sets: validSets
+    sets: tempSets
   };
+
+  const existingIdx = activeWorkout.exercises.findIndex(e => e.id === currentLogExercise.id);
   if (existingIdx >= 0) {
     activeWorkout.exercises[existingIdx] = entry;
   } else {
     activeWorkout.exercises.push(entry);
   }
 
-  // Also push a temporary entry into history for last-log display (will be finalized on complete)
-  // For simplicity we update a "draft" and also keep history clean until mark complete
+  // Persist draft so it survives page refresh
+  saveDraft();
 
-  showToast(`Saved ${currentLogExercise.name}`);
+  showToast(`Saved ${currentLogExercise.name} (${tempSets.length} set${tempSets.length > 1 ? "s" : ""})`);
   document.getElementById("log-modal").classList.add("hidden");
-  renderExercises(); // refresh last log text
+  renderExercises(); // now shows the just-saved sets
   document.getElementById("mark-complete-btn").style.display = "inline-block";
 });
 
@@ -277,6 +309,7 @@ document.getElementById("mark-complete-btn").addEventListener("click", () => {
   hist.push(activeWorkout);
   saveHistory(hist);
   activeWorkout = null;
+  saveDraft(); // clears the draft
   document.getElementById("mark-complete-btn").style.display = "none";
   showToast("Workout saved to history!");
   renderSuggestion();
@@ -387,6 +420,10 @@ function showToast(msg) {
 
 // ===== Init =====
 function init() {
+  // Restore any in-progress workout from a previous session
+  if (loadDraft()) {
+    document.getElementById("mark-complete-btn").style.display = "inline-block";
+  }
   renderSuggestion();
   renderExercises();
   renderHistory();
