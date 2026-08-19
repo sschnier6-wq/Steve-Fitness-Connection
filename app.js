@@ -242,12 +242,6 @@ function renderExercises() {
     const container = document.getElementById(`${cat}-exercises`);
     container.innerHTML = "";
 
-    // Add Exercise button at top of each tab
-    const addBar = document.createElement("div");
-    addBar.className = "add-exercise-bar";
-    addBar.innerHTML = `<button class="btn secondary add-ex-btn" data-cat="${cat}">+ Add Exercise</button>`;
-    container.appendChild(addBar);
-
     const allEx = getAllEquipment(cat);
     // Suggested first, then others
     const suggested = allEx.filter(ex => suggestedIds.has(ex.id));
@@ -292,18 +286,15 @@ function renderExercises() {
     };
   });
 
-  // Add exercise buttons
-  document.querySelectorAll(".add-ex-btn").forEach(btn => {
-    btn.addEventListener("click", () => openAddExerciseModal(btn.dataset.cat));
-  });
 }
+
 
 function buildExerciseCard(ex, cat, startCollapsed) {
   const last = getLastForExercise(ex.id);
   let lastText = "No previous log";
   if (last && last.sets && last.sets.length) {
     const lt = ex.logType || "strength";
-    lastText = "Last: " + last.sets.map(s => formatSetDisplay(s, lt)).filter(Boolean).join(", ");
+    lastText = "Last: " + last.sets.map(s => formatSetDisplay(s, lt, ex.customUnits)).filter(Boolean).join(", ");
   }
 
   const card = document.createElement("div");
@@ -341,14 +332,14 @@ function buildExerciseCard(ex, cat, startCollapsed) {
 }
 
 // ===== Modal Logic =====
-function formatSetDisplay(set, logType) {
+function formatSetDisplay(set, logType, customUnits) {
   if (!set) return "";
   logType = logType || "strength";
   if (logType === "time" || logType === "cardio") {
     const unit = set.unit || (logType === "cardio" ? "min" : "sec");
     const d = set.duration != null ? set.duration : set.reps;
     const label = set.label ? " " + set.label : "";
-    return d + unit + label;
+    return d + " " + unit + label;
   }
   if (logType === "steps") {
     return (set.steps != null ? set.steps : set.reps) + " steps";
@@ -357,8 +348,25 @@ function formatSetDisplay(set, logType) {
     const label = set.label ? " " + set.label : "";
     return (set.reps != null ? set.reps : "") + " reps" + label;
   }
-  // strength
-  if (set.weight != null && set.reps != null) return set.reps + "@" + set.weight;
+  if (logType === "custom") {
+    const u1 = (customUnits && customUnits.field1) || set.u1 || "";
+    const u2 = (customUnits && customUnits.field2) || set.u2 || "";
+    const v1 = set.v1 != null ? set.v1 : "";
+    const v2 = set.v2 != null ? set.v2 : "";
+    if (v1 === "" && v2 === "") return "";
+    // Prefer "10 reps @ 130 lbs" style when second unit looks like weight
+    if (v2 !== "" && u2 && /lb|kg|pound|kilo/i.test(u2)) {
+      return v1 + (u1 ? " " + u1 : "") + " @ " + v2 + " " + u2;
+    }
+    if (v2 !== "") {
+      return v1 + (u1 ? " " + u1 : "") + " · " + v2 + (u2 ? " " + u2 : "");
+    }
+    return v1 + (u1 ? " " + u1 : "");
+  }
+  // strength: 10@130 or 10 reps @ 130 lbs
+  if (set.weight != null && set.reps != null) return set.reps + " reps @ " + set.weight + " lbs";
+  if (set.reps != null) return set.reps + " reps";
+  if (set.weight != null) return set.weight + " lbs";
   return "";
 }
 
@@ -370,15 +378,19 @@ function openLogModal(exId, cat) {
   }
   currentLogExercise = { ...ex, category: cat };
   const logType = ex.logType || "strength";
+  const customUnits = ex.customUnits || null;
+  const defaultCount = Math.max(1, Math.min(10, ex.defaultSetCount || 3));
 
   // Empty defaults by type
   const emptySet = () => {
     if (logType === "time" || logType === "cardio") return { duration: "", label: "", unit: logType === "cardio" ? "min" : "sec" };
     if (logType === "steps") return { steps: "" };
     if (logType === "reps") return { reps: "", label: "" };
+    if (logType === "custom") return { v1: "", v2: "", u1: (customUnits && customUnits.field1) || "", u2: (customUnits && customUnits.field2) || "" };
     return { weight: "", reps: "" };
   };
-  currentSets = [emptySet(), emptySet(), emptySet()];
+  currentSets = [];
+  for (let i = 0; i < defaultCount; i++) currentSets.push(emptySet());
 
   // 1. Prefer suggested sets (including core)
   const suggestion = generateSuggestion();
@@ -405,9 +417,9 @@ function openLogModal(exId, cat) {
     currentSets = last.sets.map(s => ({ ...emptySet(), ...s }));
   }
 
-  // Keep suggested count (don't force 3 for time/reps holds)
-  if (logType === "strength" && currentSets.length < 3) {
-    while (currentSets.length < 3) currentSets.push(emptySet());
+  // Pad to at least defaultCount for strength; keep suggested length otherwise
+  if (logType === "strength") {
+    while (currentSets.length < defaultCount) currentSets.push(emptySet());
   }
 
   document.getElementById("modal-title").textContent = `Log: ${ex.name}`;
@@ -445,10 +457,19 @@ function renderSetInputs() {
         <input type="number" placeholder="reps" value="${set.reps != null ? set.reps : ""}" data-idx="${i}" data-field="reps" inputmode="numeric">
         <input type="text" placeholder="label (e.g. per side)" value="${set.label || ""}" data-idx="${i}" data-field="label">
       `;
-    } else {
+    } else if (logType === "custom") {
+      const cu = currentLogExercise.customUnits || {};
+      const p1 = cu.field1 || "value 1";
+      const p2 = cu.field2 || "";
       fields = `
-        <input type="number" placeholder="lbs" value="${set.weight != null ? set.weight : ""}" data-idx="${i}" data-field="weight" inputmode="numeric">
+        <input type="number" placeholder="${p1}" value="${set.v1 != null ? set.v1 : ""}" data-idx="${i}" data-field="v1" inputmode="numeric">
+        ${p2 ? `<input type="number" placeholder="${p2}" value="${set.v2 != null ? set.v2 : ""}" data-idx="${i}" data-field="v2" inputmode="numeric">` : ""}
+      `;
+    } else {
+      // strength: reps @ weight combination
+      fields = `
         <input type="number" placeholder="reps" value="${set.reps != null ? set.reps : ""}" data-idx="${i}" data-field="reps" inputmode="numeric">
+        <input type="number" placeholder="lbs" value="${set.weight != null ? set.weight : ""}" data-idx="${i}" data-field="weight" inputmode="numeric">
       `;
     }
     row.innerHTML = `<label>Set ${i + 1}</label>${fields}`;
@@ -466,9 +487,11 @@ function renderSetInputs() {
 
 document.getElementById("add-set-btn").addEventListener("click", () => {
   const logType = (currentLogExercise && currentLogExercise.logType) || "strength";
+  const cu = (currentLogExercise && currentLogExercise.customUnits) || {};
   if (logType === "time" || logType === "cardio") currentSets.push({ duration: "", label: "", unit: logType === "cardio" ? "min" : "sec" });
   else if (logType === "steps") currentSets.push({ steps: "" });
   else if (logType === "reps") currentSets.push({ reps: "", label: "" });
+  else if (logType === "custom") currentSets.push({ v1: "", v2: "", u1: cu.field1 || "", u2: cu.field2 || "" });
   else currentSets.push({ weight: "", reps: "" });
   renderSetInputs();
 });
@@ -497,9 +520,22 @@ document.getElementById("save-log-btn").addEventListener("click", () => {
       const r = inputs[0] ? inputs[0].value.trim() : "";
       const label = inputs[1] ? inputs[1].value.trim() : "";
       if (r !== "") tempSets.push({ reps: Number(r), label: label || undefined });
+    } else if (logType === "custom") {
+      const cu = (currentLogExercise && currentLogExercise.customUnits) || {};
+      const v1 = inputs[0] ? inputs[0].value.trim() : "";
+      const v2 = inputs[1] ? inputs[1].value.trim() : "";
+      if (v1 !== "" || v2 !== "") {
+        tempSets.push({
+          v1: v1 !== "" ? Number(v1) : "",
+          v2: v2 !== "" ? Number(v2) : "",
+          u1: cu.field1 || "",
+          u2: cu.field2 || ""
+        });
+      }
     } else {
-      const w = inputs[0] ? inputs[0].value.trim() : "";
-      const r = inputs[1] ? inputs[1].value.trim() : "";
+      // strength: first input is reps, second is lbs
+      const r = inputs[0] ? inputs[0].value.trim() : "";
+      const w = inputs[1] ? inputs[1].value.trim() : "";
       if (r !== "") tempSets.push({ weight: w !== "" ? Number(w) : 0, reps: Number(r) });
       else if (w !== "") tempSets.push({ weight: Number(w), reps: 1 });
     }
@@ -703,8 +739,9 @@ function renderHistory() {
         const idx = +item.dataset.idx;
         const w = hist[idx];
         let detailHtml = w.exercises.map(e => {
-          const lt = (findExercise(e.id, e.category) || {}).logType || "strength";
-          const setsStr = e.sets.map(s => formatSetDisplay(s, lt) || `${s.reps || ""}@${s.weight || ""}`).join("<br>");
+          const found = findExercise(e.id, e.category) || {};
+          const lt = found.logType || "strength";
+          const setsStr = e.sets.map(s => formatSetDisplay(s, lt, found.customUnits) || `${s.reps || ""}@${s.weight || ""}`).join("<br>");
           return `<div class="ex" style="margin-bottom:10px;">
             <strong>${e.name}</strong>
             <div class="sets" style="margin-top:2px;">${setsStr}</div>
@@ -851,12 +888,24 @@ function openAddExerciseModal(defaultCat) {
   document.getElementById("add-ex-brand").value = "";
   document.getElementById("add-ex-notes").value = "";
   document.getElementById("add-ex-category").value = defaultCat || "upper";
+  const defaultLog = defaultCat === "aerobic" ? "cardio" : (defaultCat === "core" ? "time" : "strength");
+  document.getElementById("add-ex-logtype").value = defaultLog;
+  document.getElementById("add-ex-field1").value = "";
+  document.getElementById("add-ex-field2").value = "";
+  document.getElementById("add-ex-custom-fields").style.display = defaultLog === "custom" ? "block" : "none";
+  document.getElementById("add-ex-default-sets").value = "3";
   document.getElementById("add-ex-preview").src = "";
   document.getElementById("add-ex-preview").style.display = "none";
   document.getElementById("add-ex-file").value = "";
   window._pendingExImage = null;
   document.getElementById("add-exercise-modal").classList.remove("hidden");
 }
+
+// Show custom unit fields when "Custom" is selected
+document.getElementById("add-ex-logtype").addEventListener("change", (e) => {
+  document.getElementById("add-ex-custom-fields").style.display =
+    e.target.value === "custom" ? "block" : "none";
+});
 
 document.getElementById("add-ex-file").addEventListener("change", (e) => {
   const file = e.target.files[0];
@@ -880,24 +929,42 @@ document.getElementById("save-new-exercise-btn").addEventListener("click", () =>
   const cat = document.getElementById("add-ex-category").value;
   const brand = document.getElementById("add-ex-brand").value.trim() || "Custom";
   const notes = document.getElementById("add-ex-notes").value.trim();
+  const logType = document.getElementById("add-ex-logtype").value || "strength";
+  const field1 = document.getElementById("add-ex-field1").value.trim();
+  const field2 = document.getElementById("add-ex-field2").value.trim();
+  let defaultSetCount = parseInt(document.getElementById("add-ex-default-sets").value, 10);
+  if (!defaultSetCount || defaultSetCount < 1) defaultSetCount = 3;
+  if (defaultSetCount > 10) defaultSetCount = 10;
+
   if (!name) {
     showToast("Please enter an exercise name");
     return;
   }
+  if (logType === "custom" && !field1) {
+    showToast("Enter at least Field 1 unit label for custom tracking");
+    return;
+  }
+
   const id = "custom-" + name.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + Date.now().toString(36);
   const list = getCustomExercises();
-  list.push({
+  const entry = {
     id,
     name,
     brand,
     notes,
     category: cat,
     img: window._pendingExImage || "ab-crunch.jpg",
+    logType,
+    defaultSetCount,
     custom: true
-  });
+  };
+  if (logType === "custom") {
+    entry.customUnits = { field1: field1, field2: field2 || "" };
+  }
+  list.push(entry);
   saveCustomExercises(list);
   document.getElementById("add-exercise-modal").classList.add("hidden");
-  showToast(`Added "${name}"`);
+  showToast(`Added "${name}" (${logType})`);
   renderExercises();
 });
 
@@ -926,6 +993,15 @@ function init() {
   renderSuggestion();
   renderExercises();
   renderHistory();
+
+  // Wire Add Exercise buttons (static in tab headers) – once
+  document.querySelectorAll(".add-ex-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openAddExerciseModal(btn.dataset.cat || "upper");
+    });
+  });
 }
 
 // Save draft whenever the page is backgrounded or closed so nothing is lost

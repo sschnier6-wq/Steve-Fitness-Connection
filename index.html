@@ -47,22 +47,34 @@
     <!-- Tab Contents -->
     <main>
       <section id="upper" class="tab-content active">
-        <h2>Upper Body</h2>
+        <div class="tab-header-row">
+          <h2>Upper Body</h2>
+          <button type="button" class="btn primary add-ex-btn" data-cat="upper">+ Add Exercise</button>
+        </div>
         <div id="upper-exercises" class="exercise-grid"></div>
       </section>
 
       <section id="lower" class="tab-content">
-        <h2>Lower Body</h2>
+        <div class="tab-header-row">
+          <h2>Lower Body</h2>
+          <button type="button" class="btn primary add-ex-btn" data-cat="lower">+ Add Exercise</button>
+        </div>
         <div id="lower-exercises" class="exercise-grid"></div>
       </section>
 
       <section id="core" class="tab-content">
-        <h2>Core & Mobility</h2>
+        <div class="tab-header-row">
+          <h2>Core & Mobility</h2>
+          <button type="button" class="btn primary add-ex-btn" data-cat="core">+ Add Exercise</button>
+        </div>
         <div id="core-exercises" class="exercise-grid"></div>
       </section>
 
       <section id="aerobic" class="tab-content">
-        <h2>Aerobic</h2>
+        <div class="tab-header-row">
+          <h2>Aerobic</h2>
+          <button type="button" class="btn primary add-ex-btn" data-cat="aerobic">+ Add Exercise</button>
+        </div>
         <div id="aerobic-exercises" class="exercise-grid"></div>
       </section>
 
@@ -110,10 +122,31 @@
         <input type="text" id="add-ex-brand" placeholder="e.g. Life Fitness, Cable, Bodyweight" class="text-input">
         <label class="field-label">Notes (optional)</label>
         <input type="text" id="add-ex-notes" placeholder="Form cue or tip" class="text-input">
+
+        <label class="field-label">How do you track this exercise?</label>
+        <select id="add-ex-logtype" class="text-input">
+          <option value="strength">Weight + Reps (e.g. 10 reps @ 130 lbs)</option>
+          <option value="time">Time in seconds (e.g. 30 sec holds)</option>
+          <option value="cardio">Time in minutes (e.g. 45 min cycling)</option>
+          <option value="reps">Reps only (e.g. 10 per side)</option>
+          <option value="steps">Steps (e.g. 10 steps)</option>
+          <option value="custom">Custom units (define your own fields)</option>
+        </select>
+        <div id="add-ex-custom-fields" style="display:none;">
+          <label class="field-label">Field 1 unit label</label>
+          <input type="text" id="add-ex-field1" placeholder="e.g. reps, sec, rounds" class="text-input">
+          <label class="field-label">Field 2 unit label (optional – leave blank for one field)</label>
+          <input type="text" id="add-ex-field2" placeholder="e.g. lbs, each leg, per side" class="text-input">
+          <p style="font-size:0.8rem;color:var(--muted);margin:6px 0;">Examples: Field1=reps Field2=lbs → "10 reps @ 130 lbs". Field1=sec Field2=each leg → "30 sec each leg".</p>
+        </div>
+
+        <label class="field-label">Default number of sets</label>
+        <input type="number" id="add-ex-default-sets" value="3" min="1" max="10" class="text-input" inputmode="numeric">
+
         <label class="field-label">Photo (optional)</label>
         <input type="file" id="add-ex-file" accept="image/*" class="file-input">
         <img id="add-ex-preview" class="modal-img" style="display:none;margin-top:8px;">
-        <p style="font-size:0.8rem;color:var(--muted);margin:8px 0;">New exercises default to 3 sets when logging.</p>
+        <p style="font-size:0.8rem;color:var(--muted);margin:8px 0;">You can change values when logging each workout.</p>
         <button id="save-new-exercise-btn" class="btn primary" style="width:100%;margin-top:8px;">Save Exercise</button>
       </div>
     </div>

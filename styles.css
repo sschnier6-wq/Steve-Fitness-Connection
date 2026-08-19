@@ -472,3 +472,23 @@ header h1 {
   color: #000;
   font-weight: 700;
 }
+
+.tab-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.tab-header-row h2 {
+  margin: 0;
+  flex: 1;
+  min-width: 120px;
+}
+.tab-header-row .add-ex-btn {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
